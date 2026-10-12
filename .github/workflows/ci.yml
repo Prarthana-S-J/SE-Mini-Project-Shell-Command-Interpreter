@@ -1,0 +1,22 @@
+
+name: Simple Shell CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  repository-check:
+    name: Verify repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify project files
+        run: |
+          test -f README.md
+          test -f .gitignore
+          echo "Repository files verified successfully."
