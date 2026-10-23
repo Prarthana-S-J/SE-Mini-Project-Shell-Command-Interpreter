@@ -1,0 +1,274 @@
+/*
+ * parser.c - Tokenizer / command-line parser.
+ * Owner: Member 2 (Parser, tokenization, expansion)
+ *
+ * Grammar (informal):
+ *   pipeline   := command ( '|' command )* [ '&' | ';' ]
+ *   command    := ( WORD | redirect )+       (at least one WORD)
+ *   redirect   := ( '<' | '>' | '>>' ) WORD
+ *
+ * Words support single quotes, double quotes, backslash escapes, and
+ * expansion of $NAME, ${NAME}, $?, $$ and a leading ~ (outside single quotes).
+ */
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
+#include "parser.h"
+
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "utils.h"
+
+static int is_blank(char c) { return c == ' ' || c == '\t' || c == '\r'; }
+static int is_meta(char c)
+{
+    return c == ';'
+        ;
+}
+static int ends_word(char c){ return c == '\0' || c == '\n' || is_blank(c) ||
+                                     is_meta(c); }
+
+static void seterr(char *errbuf, size_t errlen, const char *msg)
+{
+    snprintf(errbuf, errlen, "%s", msg);
+}
+
+/* ---------- Command helpers ------------------------------------------- */
+
+static void command_init(Command *c)
+{
+    c->argv = xmalloc(sizeof(char *));
+    c->argv[0] = NULL;
+    c->argc = 0;
+    c->infile = c->outfile = NULL;
+    c->append = 0;
+}
+
+static void command_add_arg(Command *c, char *word)
+{
+    c->argv = xrealloc(c->argv, (size_t)(c->argc + 2) * sizeof(char *));
+    c->argv[c->argc++] = word;
+    c->argv[c->argc] = NULL;
+}
+
+static int command_is_empty(const Command *c)
+{
+    return c->argc == 0 && c->infile == NULL && c->outfile == NULL;
+}
+
+static void command_free(Command *c)
+{
+    int i;
+    for (i = 0; i < c->argc; i++)
+        free(c->argv[i]);
+    free(c->argv);
+    free(c->infile);
+    free(c->outfile);
+    c->argv = NULL;
+    c->infile = c->outfile = NULL;
+}
+
+void pipeline_free(Pipeline *pl)
+{
+    int i;
+    for (i = 0; i < pl->ncmds; i++)
+        command_free(&pl->cmds[i]);
+    free(pl->cmds);
+    free(pl->text);
+    pl->cmds = NULL;
+    pl->text = NULL;
+    pl->ncmds = 0;
+}
+
+/* ---------- Expansion -------------------------------------------------- */
+
+
+/*
+ * Read one word starting at *pp. On success returns 0, sets *out to a heap
+ * string (or NULL when an unquoted expansion produced an empty result and the
+ * word must be dropped) and advances *pp. Returns -1 on error.
+ */
+static int read_word(const char **pp, int last_status, char **out,
+                     char *errbuf, size_t errlen)
+{
+    const char *p = *pp;
+    StrBuf sb;
+    int quoted = 0;
+
+    (void)last_status;
+    sb_init(&sb);
+
+
+    while (!ends_word(*p)) {
+        if (*p == '\'') {
+            quoted = 1;
+            p++;
+            while (*p && *p != '\'')
+                sb_putc(&sb, *p++);
+            if (!*p) {
+                sb_free(&sb);
+                seterr(errbuf, errlen, "syntax error: unterminated single quote");
+                return -1;
+            }
+            p++;
+        } else if (*p == '"') {
+            quoted = 1;
+            p++;
+            while (*p && *p != '"') {
+                if (*p == '\\' && (p[1] == '"' || p[1] == '\\' || p[1] == '$')) {
+                    sb_putc(&sb, p[1]);
+                    p += 2;
+                } else {
+                    sb_putc(&sb, *p++);
+                }
+            }
+            if (!*p) {
+                sb_free(&sb);
+                seterr(errbuf, errlen, "syntax error: unterminated double quote");
+                return -1;
+            }
+            p++;
+        } else if (*p == '\\') {
+            quoted = 1;
+            if (p[1] != '\0' && p[1] != '\n') {
+                sb_putc(&sb, p[1]);
+                p += 2;
+            } else {
+                p++;                       /* trailing backslash: ignored */
+            }
+        } else {
+            sb_putc(&sb, *p++);
+        }
+    }
+
+    *pp = p;
+    if (sb.len == 0 && !quoted) {
+        sb_free(&sb);
+        *out = NULL;                       /* empty unquoted expansion */
+    } else {
+        *out = sb_take(&sb);
+    }
+    return 0;
+}
+
+/* ---------- Pipeline parser ------------------------------------------- */
+
+static void skip_to_end(const char **cursor)
+{
+    *cursor += strlen(*cursor);
+}
+
+static void fail(Pipeline *pl, Command *cur, const char **cursor,
+                 char *errbuf, size_t errlen, const char *msg)
+{
+    if (msg)
+        seterr(errbuf, errlen, msg);
+    command_free(cur);
+    pipeline_free(pl);
+    skip_to_end(cursor);
+}
+
+static void pipeline_push(Pipeline *pl, Command *c, int *cap)
+{
+    if (pl->ncmds == *cap) {
+        *cap *= 2;
+        pl->cmds = xrealloc(pl->cmds, (size_t)*cap * sizeof(Command));
+    }
+    pl->cmds[pl->ncmds++] = *c;
+}
+
+ParseResult parse_next_pipeline(const char **cursor, int last_status,
+                                Pipeline *pl, char *errbuf, size_t errlen)
+{
+    const char *p = *cursor;
+    const char *start, *end = NULL;
+    Command cur;
+    int cap = 4;
+    int pipe_pending = 0;
+    char terminator = '\0';
+
+    memset(pl, 0, sizeof *pl);
+    errbuf[0] = '\0';
+
+    /* Skip leading blanks, newlines and comments. */
+    for (;;) {
+        while (is_blank(*p) || *p == '\n')
+            p++;
+        if (*p == '#') {
+            while (*p && *p != '\n')
+                p++;
+            continue;
+        }
+        break;
+    }
+    if (*p == '\0') {
+        *cursor = p;
+        return PARSE_END;
+    }
+
+    start = p;
+    pl->cmds = xmalloc((size_t)cap * sizeof(Command));
+    command_init(&cur);
+
+    for (;;) {
+        char c;
+        while (is_blank(*p))
+            p++;
+        c = *p;
+
+        if (c == '#') {                     /* comment to end of line */
+            while (*p && *p != '\n')
+                p++;
+            continue;
+        }
+        if (c == '\0' || c == '\n' || c == ';'
+            ) {
+            end = p;
+            terminator = c;
+            if (c != '\0')
+                p++;
+            break;
+        }
+        /* ordinary word */
+        {
+            char *word = NULL;
+            if (read_word(&p, last_status, &word, errbuf, errlen) < 0) {
+                fail(pl, &cur, cursor, errbuf, errlen, NULL);
+                return PARSE_ERROR;
+            }
+            if (word) {
+                command_add_arg(&cur, word);
+                pipe_pending = 0;
+            }
+        }
+    }
+
+    /* Finalise the last command of the pipeline. */
+    if (command_is_empty(&cur)) {
+        if (pl->ncmds == 0) {
+            char msg[64];
+            snprintf(msg, sizeof msg, "syntax error near unexpected token '%c'",
+                     terminator ? terminator : ';');
+            fail(pl, &cur, cursor, errbuf, errlen, msg);
+        } else {
+            fail(pl, &cur, cursor, errbuf, errlen,
+                 "syntax error: missing command after '|'");
+        }
+        return PARSE_ERROR;
+    }
+    if (cur.argc == 0) {
+        fail(pl, &cur, cursor, errbuf, errlen,
+             "syntax error: redirection without a command");
+        return PARSE_ERROR;
+    }
+    (void)pipe_pending;
+    pipeline_push(pl, &cur, &cap);
+    pl->text = str_trim_dup(start, (size_t)(end - start));
+    *cursor = p;
+    return PARSE_OK;
+}
