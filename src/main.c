@@ -8,9 +8,16 @@
  */
 #include <stdio.h>
 
-/* Starting point of the project: the real shell is built up story by story (see stories/README.md). */
+#include "shell.h"
+
 int main(void)
 {
-    printf("mysh 1.0 - skeleton: no commands are implemented yet\n");
-    return 0;
+    Shell sh;
+    int rc;
+
+    shell_init(&sh);
+    shell_setup_signals(&sh);
+    rc = shell_run_stream(&sh, stdin);
+    shell_cleanup(&sh);
+    return rc;
 }
