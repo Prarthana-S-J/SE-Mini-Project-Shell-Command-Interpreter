@@ -1,0 +1,93 @@
+TC-01	FR-09	SKIP	pwd prints the working directory	pwd	/tmp/tmp.iZ3lOIAiJe
+TC-02	FR-05	SKIP	ls lists named files	ls file.txt input.txt	file.txt\ninput.txt
+TC-03	FR-05	SKIP	echo Hello prints its argument	echo Hello	Hello
+TC-10	FR-05	SKIP	cat file.txt prints the file	cat file.txt	hello world\nfoo\nhello again
+TC-30	FR-06	SKIP	$? reflects exit status of false then true	false; echo $?; true; echo $?	1\n0
+TC-56	FR-06	SKIP	child killed by signal gives status 128+sig	sh -c "kill -9 \$\$"; echo $?	137 [stderr contains: Killed]
+TC-04	FR-08	SKIP	cd sub then cd .. returns to start	cd sub; pwd; cd ..; pwd	/tmp/tmp.iZ3lOIAiJe/sub\n/tmp/tmp.iZ3lOIAiJe
+TC-05	FR-08	SKIP	cd to a missing directory reports an error	cd nosuchdir; echo $?	1 [stderr contains: No such file or directory]
+TC-06	FR-08	SKIP	cd with no argument goes to $HOME	export HOME=/tmp/tmp.iZ3lOIAiJe/sub; cd; pwd	/tmp/tmp.iZ3lOIAiJe/sub
+TC-07	FR-08	SKIP	cd - returns to previous directory and prints it	cd sub; cd -	/tmp/tmp.iZ3lOIAiJe
+TC-65	FR-08	SKIP	cd with too many arguments fails	cd a b; echo $?	1 [stderr contains: too many arguments]
+TC-08	FR-07	SKIP	unknown command -> 127 and message	invalidcommand; echo $?	127 [stderr contains: command not found]
+TC-09	FR-07	SKIP	non-executable file -> 126 and message	./noexec.sh; echo $?	126 [stderr contains: Permission denied]
+TC-66	FR-07	SKIP	missing path with slash -> No such file	./nothere; echo $?	127 [stderr contains: No such file or directory]
+TC-11	FR-16	SKIP	cat < input.txt reads stdin from file	cat < input.txt	from input
+TC-12	FR-14	SKIP	echo hello > output.txt creates the file	echo hello > output.txt; cat output.txt	hello
+TC-13	FR-14	SKIP	> truncates an existing file	echo one > t.txt; echo two > t.txt; cat t.txt	two
+TC-14	FR-15	SKIP	>> appends to an existing file	echo one > a.txt; echo two >> a.txt; cat a.txt	one\ntwo
+TC-15	FR-15	SKIP	>> creates the file when absent	echo x >> new_app.txt; cat new_app.txt	x
+TC-16	FR-17	SKIP	< missing file: error, status 1, no crash	cat < missing.txt; echo $?	1 [stderr contains: missing.txt: No such file]
+TC-17	FR-17	SKIP	> into a missing directory: error, status 1	echo hi > nodir/x.txt; echo $?	1 [stderr contains: No such file or directory]
+TC-70	FR-04	SKIP	redirection with no command is rejected	> lonely.txt	 [exit status 2] [stderr contains: redirection without a command]
+TC-71	FR-14	SKIP	spaces around > are optional	echo compact>c.txt; cat c.txt	compact
+TC-18	FR-18	SKIP	cat file.txt | grep hello	cat file.txt | grep hello	hello world\nhello again
+TC-19	FR-18	SKIP	three-stage pipeline printf | sort | uniq	printf "b\na\nb\n" | sort | uniq	a\nb
+TC-20	FR-18	SKIP	pipeline combined with < and >	sort < file.txt | head -n 1 > first.txt; cat first.txt	foo
+TC-21	FR-18	SKIP	built-in inside a pipeline (pwd | cat)	pwd | cat	/tmp/tmp.iZ3lOIAiJe
+TC-22	FR-14	SKIP	built-in with output redirection (pwd > f)	pwd > pwd.txt; cat pwd.txt	/tmp/tmp.iZ3lOIAiJe
+TC-57	FR-18	SKIP	ten-stage pipeline	echo x | cat | cat | cat | cat | cat | cat | cat | cat | cat	x
+TC-58	FR-18	SKIP	failing first stage does not hang the pipeline	nosuchcmd | cat; echo $?	0 [stderr contains: command not found]
+TC-23	FR-12	SKIP	export then $VAR	export FOO=bar; echo $FOO	bar
+TC-24	FR-12	SKIP	exported variable is visible to child processes	export FOO=bar; sh -c "echo \$FOO"	bar
+TC-25	FR-12	SKIP	NAME=VALUE assignment then $NAME	GREET=hi; echo $GREET	hi
+TC-26	FR-12	SKIP	unset removes a variable	export A=1; unset A; echo "[$A]"	[]
+TC-27	FR-12	SKIP	env lists exported variables	export ZZ_TEST=1; env | grep ZZ_TEST	ZZ_TEST=1
+TC-28	FR-13	SKIP	${NAME} form	X=ab; echo ${X}cd	abcd
+TC-29	FR-13	SKIP	unset variable expands to nothing (word dropped)	echo a $NOPE_VAR b	a b
+TC-60	FR-13	SKIP	~ expands to $HOME	export HOME=/tmp; echo ~ ~/x	/tmp /tmp/x
+TC-64	FR-12	SKIP	export with invalid identifier fails	export 1x=3; echo $?	1 [stderr contains: not a valid identifier]
+TC-38	FR-13	SKIP	double quotes allow expansion	X=w; echo "hi $X"	hi w
+TC-72	FR-13	SKIP	single quotes suppress expansion	echo '$HOME'	$HOME
+TC-61	FR-13	SKIP	$$ expands to a numeric PID	echo $$	a numeric process id
+TC-31	FR-10	SKIP	exit N returns status N	exit 7	 [exit status 7]
+TC-32	FR-10	SKIP	exit stops further commands	echo a; exit 3; echo b	a [exit status 3]
+TC-33	FR-10	SKIP	exit with non-numeric argument -> status 2	exit abc	 [exit status 2] [stderr contains: numeric argument required]
+TC-34	FR-11	SKIP	help lists the built-in commands	help	usage lines for cd, pwd, exit, help, export, unset, env plus operator summary; status 0
+TC-35	FR-19	SKIP	; runs commands in order	echo a; echo b; echo c	a\nb\nc
+TC-37	FR-03	SKIP	double quotes preserve inner spaces	echo "a   b"	a   b
+TC-39	FR-03	SKIP	backslash escapes a space	echo a\ b	a b
+TC-40	FR-03	SKIP	comment is ignored	echo hi # comment	hi
+TC-41	FR-04	SKIP	unterminated quote -> syntax error, status 2	echo "abc	 [exit status 2] [stderr contains: unterminated double quote]
+TC-42	FR-04	SKIP	leading | is a syntax error	| ls	 [exit status 2] [stderr contains: syntax error]
+TC-43	FR-04	SKIP	trailing | is a syntax error	ls |	 [exit status 2] [stderr contains: syntax error]
+TC-44	FR-04	SKIP	redirection without file name	cat <	 [exit status 2] [stderr contains: missing file name]
+TC-45	FR-04	SKIP	&& is reported as unsupported	echo a && echo b	 [exit status 2] [stderr contains: '&&' is not supported]
+TC-46	FR-04	SKIP	syntax error discards rest of line	echo before; echo "oops; echo after	before [exit status 2] [stderr contains: unterminated]
+TC-47	FR-01	SKIP	blank / whitespace-only input does nothing	     	
+TC-73	FR-04	SKIP	|| is reported as unsupported	false || echo b	 [exit status 2] [stderr contains: '||' is not supported]
+TC-48	FR-05	SKIP	PATH lookup finds a user-added directory	export PATH=/tmp/tmp.iZ3lOIAiJe/bin:$PATH; hello_tool	tool-ran
+TC-49	FR-05	SKIP	relative path with / bypasses PATH	./bin/hello_tool	tool-ran
+TC-36	FR-20	SKIP	'sleep 2 &' returns immediately	sleep 2 & echo started	prints "started" in < 1.5 s (does not wait 2 s)
+TC-74	FR-20	SKIP	background pipeline does not block the shell	sleep 1 | sleep 1 & echo bg-pipeline	prints "bg-pipeline" in < 0.8 s
+TC-75	FR-20	SKIP	background command with redirection completes its work	echo bgdata > bg.txt & sleep 0.5; cat bg.txt	bgdata
+TC-50	FR-02	SKIP	script file argument is executed	mysh script.mysh   (script: echo line1 / echo line2)	line1, line2
+TC-51	FR-02	SKIP	commands can be piped to the shell on stdin (no prompt)	printf 'echo a\necho b\n' | mysh	a, b and no prompt text
+TC-52	FR-22	SKIP	EOF on stdin ends the shell with the last command's status	printf 'false\n' | mysh; echo $?	exit status 1
+TC-53	FR-10	SKIP	exit inside a script stops the script	mysh exit.mysh   (script: echo first / exit 5 / echo never)	first; exit status 5; "never" not printed
+TC-62	FR-02	SKIP	'-c' without an argument -> usage error (status 2)	mysh -c	usage message; exit status 2
+TC-63	FR-02	SKIP	missing script file -> status 127	mysh /no/such/script	error message; exit status 127
+TC-76	FR-02	PASS	--version prints the version	mysh --version	line beginning with "mysh"
+TC-54	NFR-02	SKIP	command with 2000 arguments	echo 1 2 3 ... 2000  (2000 arguments)	exactly 2000 words printed
+TC-55	NFR-02	SKIP	single 100000-character argument	echo <100000 x "a">	100001 bytes printed
+TC-77	NFR-02	SKIP	300 consecutive pipelines (no fd/process leak)	true | true;  (repeated 300 times) echo survived	survived
+SC-01	SR-01	SKIP	metacharacters inside quotes are passed literally; no injection	echo "a; echo injected | cat > pwned"; ls pwned; echo ls-status=$?	a; echo injected | cat > pwned\nls-status=2 [stderr contains: No such file]
+SC-02	SR-02	SKIP	operators inside a variable value are not re-interpreted	X="a; echo pwned"; echo $X	a; echo pwned
+SC-03	SR-01	SKIP	file names containing metacharacters are used literally	echo hi > 'weird;name|x'	exit status 0; one file named exactly weird;name|x containing hi
+SC-04	SR-01	PASS	source contains no system()/popen()/sh -c invocation	grep -E '(system|popen)\s*\(' src/*.c  and  grep for exec of /bin/sh	no matches (user text is never handed to another shell)
+SC-05	SR-03	SKIP	shell never changes uid/gid; children run as the invoking user	grep for setuid/setgid/seteuid/setreuid in src/; mysh -c 'id -u'	no matches; child uid equals the invoking user's uid
+SC-06	SR-04	PASS	shell writes no history/log/state files of its own	session of 6 commands (pipe, cd, export, error, redirect to /dev/null) with HOME and cwd empty	no file created in HOME or cwd (no history, no log)
+SC-07	SR-05	SKIP	created files are never more permissive than 0644 and honour the umask	echo x > f   under umask 077 / 022 / 000	file modes 600 / 644 / 644 (never more permissive than 0644)
+SC-08	SR-07	SKIP	invalid variable names are rejected and the environment is unchanged	export "a-b=1"; echo $?; env | grep -c a-b	1\n0 [exit status 1] [stderr contains: not a valid identifier]
+SC-09	SR-08	SKIP	executed programs inherit no descriptors beyond 0,1,2 after 300 pipelines	300 x 'true | true' then python3 fdcheck.py (lists inherited descriptors >= 3)	[]
+SC-10	SR-08	SKIP	script file descriptor is not inherited by executed programs	mysh fd.mysh   (script runs python3 fdcheck.py)	[]  (the script file descriptor is close-on-exec)
+SC-11	SR-10	SKIP	background jobs cannot read the shell's standard input	printf 'SECRET' | mysh -c 'cat & sleep 0.5'	no output: the background cat read /dev/null, not the shell's stdin
+NF-01	NFR-01	FAIL	background start returns in <= 500 ms	sleep 2 & echo started	control returns in <= 500 ms although the job runs 2 s
+NF-02	NFR-01	PASS	1000 external commands in <= 5 s (measured 432 ms, mean 432 us)	1000 x 'true' (fork+exec) in one -c string	total <= 5000 ms (mean <= 5 ms per external command)
+NF-03	NFR-01	PASS	1000 built-in commands in <= 1 s (measured 416 ms)	1000 x 'pwd > /dev/null' (built-in, no process)	total <= 1000 ms
+NF-04	NFR-03	SKIP	diagnostics use the 'mysh: <reason>' format	12 different error scenarios (bad command, bad cd, bad redirect, syntax errors, bad export/exit)	every stderr line starts with 'mysh: ' followed by a reason
+NF-05	NFR-04	PASS	all 6 source files compile with 0 warnings under -Wall -Wextra -Wpedantic -Werror	gcc -std=c11 -Wall -Wextra -Wpedantic -Werror -fsyntax-only src/*.c	no warnings, no errors
+NF-06	NFR-05	PASS	sources also compile as C99 + POSIX.1-2008 (no GNU-only language extensions)	gcc -std=c99 -fsyntax-only src/*.c   (C99 plus POSIX.1-2008 only)	compiles; no compiler-specific extensions needed beyond POSIX
+NF-07	NFR-09	SKIP	shell survives 10 consecutive faulty lines and still executes the next command	10 faulty lines (bad command, cd, redirect, syntax, export, permissions, && ...) then 'echo alive'	only 'alive' is printed: the shell survived every error
+NF-08	NFR-03	SKIP	help fits one screen and lists all 7 built-ins	help	at most 25 lines, no line longer than 80 characters, lists all 7 built-ins
+ST-10	FR-01..FR-22	SKIP	demo/demo.mysh runs end to end and produces the documented output	mysh demo/demo.mysh	all documented demo outputs present; exit status 0

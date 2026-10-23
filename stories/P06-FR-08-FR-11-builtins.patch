@@ -1,0 +1,246 @@
+diff -ruN a/src/builtins.c b/src/builtins.c
+--- a/src/builtins.c	1970-01-01 00:00:00.000000000 +0000
++++ b/src/builtins.c	2026-10-22 08:39:05.469490298 +0000
+@@ -0,0 +1,166 @@
++/*
++ * builtins.c - cd, pwd, exit, help, export, unset, env.
++ * Owner: Member 2 (Built-in commands, environment handling)
++ */
++#ifndef _POSIX_C_SOURCE
++#define _POSIX_C_SOURCE 200809L
++#endif
++#ifndef _DEFAULT_SOURCE
++#define _DEFAULT_SOURCE
++#endif
++
++#include "builtins.h"
++
++#include <errno.h>
++#include <limits.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include "utils.h"
++
++extern char **environ;
++
++static int bi_cd(Shell *sh, int argc, char **argv);
++static int bi_pwd(Shell *sh, int argc, char **argv);
++static int bi_exit(Shell *sh, int argc, char **argv);
++static int bi_help(Shell *sh, int argc, char **argv);
++
++typedef struct {
++    const char *name;
++    int (*fn)(Shell *, int, char **);
++    const char *usage;
++    const char *summary;
++} Builtin;
++
++static const Builtin builtins[] = {
++    { "cd",     bi_cd,     "cd [dir | -]",         "change the working directory" },
++    { "pwd",    bi_pwd,    "pwd",                  "print the working directory" },
++    { "exit",   bi_exit,   "exit [status]",        "leave the shell" },
++    { "help",   bi_help,   "help",                 "show this list of built-in commands" },
++};
++
++#define NBUILTINS (sizeof builtins / sizeof builtins[0])
++
++int is_builtin(const char *name)
++{
++    size_t i;
++    for (i = 0; i < NBUILTINS; i++)
++        if (strcmp(name, builtins[i].name) == 0)
++            return 1;
++    return 0;
++}
++
++int run_builtin(Shell *sh, int argc, char **argv)
++{
++    size_t i;
++    for (i = 0; i < NBUILTINS; i++)
++        if (strcmp(argv[0], builtins[i].name) == 0)
++            return builtins[i].fn(sh, argc, argv);
++    return 127;
++}
++
++/* ---- cd ---------------------------------------------------------------- */
++static int bi_cd(Shell *sh, int argc, char **argv)
++{
++    const char *target;
++    char oldcwd[PATH_MAX], newcwd[PATH_MAX];
++    int print_dir = 0;
++    (void)sh;
++
++    if (argc > 2) {
++        shell_error("cd: too many arguments");
++        return 1;
++    }
++    if (argc == 1) {
++        target = getenv("HOME");
++        if (!target || !*target) {
++            shell_error("cd: HOME not set");
++            return 1;
++        }
++    } else if (strcmp(argv[1], "-") == 0) {
++        target = getenv("OLDPWD");
++        if (!target || !*target) {
++            shell_error("cd: OLDPWD not set");
++            return 1;
++        }
++        print_dir = 1;
++    } else {
++        target = argv[1];
++    }
++
++    if (!getcwd(oldcwd, sizeof oldcwd))
++        oldcwd[0] = '\0';
++    if (chdir(target) != 0) {
++        shell_error("cd: %s: %s", target, strerror(errno));
++        return 1;
++    }
++    if (oldcwd[0])
++        setenv("OLDPWD", oldcwd, 1);
++    if (getcwd(newcwd, sizeof newcwd)) {
++        setenv("PWD", newcwd, 1);
++        if (print_dir)
++            printf("%s\n", newcwd);
++    }
++    return 0;
++}
++
++/* ---- pwd --------------------------------------------------------------- */
++static int bi_pwd(Shell *sh, int argc, char **argv)
++{
++    char cwd[PATH_MAX];
++    (void)sh; (void)argc; (void)argv;
++    if (!getcwd(cwd, sizeof cwd)) {
++        shell_error("pwd: %s", strerror(errno));
++        return 1;
++    }
++    printf("%s\n", cwd);
++    return 0;
++}
++
++/* ---- exit -------------------------------------------------------------- */
++static int bi_exit(Shell *sh, int argc, char **argv)
++{
++    if (argc > 2) {
++        shell_error("exit: too many arguments");
++        return 1;
++    }
++    if (argc == 2) {
++        char *end;
++        long v;
++        errno = 0;
++        v = strtol(argv[1], &end, 10);
++        if (errno != 0 || *argv[1] == '\0' || *end != '\0') {
++            shell_error("exit: %s: numeric argument required", argv[1]);
++            sh->exit_code = 2;
++        } else {
++            sh->exit_code = (int)(v & 0xFF);
++        }
++    } else {
++        sh->exit_code = sh->last_status;
++    }
++    sh->running = 0;
++    return sh->exit_code;
++}
++
++/* ---- help -------------------------------------------------------------- */
++static int bi_help(Shell *sh, int argc, char **argv)
++{
++    size_t i;
++    (void)sh; (void)argc; (void)argv;
++    printf("%s %s - simple Unix-like shell\n", SHELL_NAME, SHELL_VERSION);
++    printf("Built-in commands:\n");
++    for (i = 0; i < NBUILTINS; i++)
++        printf("  %-22s %s\n", builtins[i].usage, builtins[i].summary);
++    printf("Operators:\n");
++    printf("  cmd > file   redirect stdout (truncate)\n");
++    printf("  cmd >> file  redirect stdout (append)\n");
++    printf("  cmd < file   redirect stdin\n");
++    printf("  a | b        pipe stdout of a into stdin of b\n");
++    printf("  cmd &        run in the background\n");
++    printf("  a ; b        run a, then b\n");
++    printf("Variables: NAME=VALUE, $NAME, ${NAME}, $?, $$, ~\n");
++    return 0;
++}
++
+diff -ruN a/src/executor.c b/src/executor.c
+--- a/src/executor.c	2026-10-22 08:37:27.007299773 +0000
++++ b/src/executor.c	2026-10-22 08:39:05.469007029 +0000
+@@ -33,7 +33,6 @@
+ {
+     (void)background;
+     (void)first;
+-    (void)sh;
+ 
+     if (in_fd >= 0) {
+         dup2(in_fd, STDIN_FILENO);
+@@ -44,6 +43,11 @@
+         close(out_fd);
+     }
+ 
++    if (is_builtin(c->argv[0])) {
++        int st = run_builtin(sh, c->argc, c->argv);
++        fflush(stdout);
++        _exit(st & 0xFF);
++    }
+ 
+     execvp(c->argv[0], c->argv);
+ 
+@@ -84,12 +88,22 @@
+ }
+ 
+ 
++/* Run a built-in in the shell process so cd/exit/export affect the shell. */
++static int run_builtin_in_parent(Shell *sh, const Command *c)
++{
++    return run_builtin(sh, c->argc, c->argv);
++}
+ 
+ int execute_pipeline(Shell *sh, const Pipeline *pl)
+ {
+     int n = pl->ncmds, i, prev_read = -1, forked = 0, status;
+     pid_t *pids;
+ 
++    if (n == 1 && !pl->background) {
++        const Command *c = &pl->cmds[0];
++        if (is_builtin(c->argv[0]))
++            return run_builtin_in_parent(sh, c);
++    }
+ 
+     pids = xmalloc((size_t)n * sizeof(pid_t));
+     fflush(NULL);           /* avoid duplicating buffered output in children */
+diff -ruN a/tests/enabled_tests.txt b/tests/enabled_tests.txt
+--- a/tests/enabled_tests.txt	2026-10-22 08:38:16.238556248 +0000
++++ b/tests/enabled_tests.txt	2026-10-22 08:39:49.096529259 +0000
+@@ -12,11 +12,18 @@
+ ST-02
+ ST-06
+ ST-08
++ST-09
+ TC-01
+ TC-02
+ TC-03
++TC-04
++TC-07
+ TC-10
+ TC-21
++TC-31
++TC-32
++TC-33
++TC-34
+ TC-35
+ TC-37
+ TC-39
+@@ -28,6 +35,7 @@
+ TC-50
+ TC-51
+ TC-52
++TC-53
+ TC-54
+ TC-55
+ TC-62

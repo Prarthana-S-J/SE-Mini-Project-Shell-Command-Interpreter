@@ -1,0 +1,205 @@
+diff -ruN a/src/executor.c b/src/executor.c
+--- a/src/executor.c	2026-10-22 08:39:05.469007029 +0000
++++ b/src/executor.c	2026-10-22 08:40:32.370035696 +0000
+@@ -24,6 +24,42 @@
+ #include "builtins.h"
+ #include "utils.h"
+ 
++/* ---- Redirection (Member 3) -------------------------------------------- */
++
++/* Apply < > >> of `c` to fds 0/1. Returns 0, or -1 after printing an error. */
++static int apply_redirections(const Command *c)
++{
++    int fd;
++
++    if (c->infile) {
++        fd = open(c->infile, O_RDONLY);
++        if (fd < 0) {
++            shell_error("%s: %s", c->infile, strerror(errno));
++            return -1;
++        }
++        if (dup2(fd, STDIN_FILENO) < 0) {
++            shell_error("dup2: %s", strerror(errno));
++            close(fd);
++            return -1;
++        }
++        close(fd);
++    }
++    if (c->outfile) {
++        int flags = O_WRONLY | O_CREAT | (c->append ? O_APPEND : O_TRUNC);
++        fd = open(c->outfile, flags, 0644);
++        if (fd < 0) {
++            shell_error("%s: %s", c->outfile, strerror(errno));
++            return -1;
++        }
++        if (dup2(fd, STDOUT_FILENO) < 0) {
++            shell_error("dup2: %s", strerror(errno));
++            close(fd);
++            return -1;
++        }
++        close(fd);
++    }
++    return 0;
++}
+ 
+ 
+ /* ---- Child side (Member 1 / Member 3) ---------------------------------- */
+@@ -42,6 +78,8 @@
+         dup2(out_fd, STDOUT_FILENO);
+         close(out_fd);
+     }
++    if (apply_redirections(c) < 0)
++        _exit(1);
+ 
+     if (is_builtin(c->argv[0])) {
+         int st = run_builtin(sh, c->argc, c->argv);
+@@ -91,7 +129,29 @@
+ /* Run a built-in in the shell process so cd/exit/export affect the shell. */
+ static int run_builtin_in_parent(Shell *sh, const Command *c)
+ {
+-    return run_builtin(sh, c->argc, c->argv);
++    int saved_in = -1, saved_out = -1, status;
++
++    if (c->infile)
++        saved_in = dup(STDIN_FILENO);
++    if (c->outfile)
++        saved_out = dup(STDOUT_FILENO);
++    fflush(stdout);
++
++    if (apply_redirections(c) < 0)
++        status = 1;
++    else
++        status = run_builtin(sh, c->argc, c->argv);
++
++    fflush(stdout);
++    if (saved_in >= 0) {
++        dup2(saved_in, STDIN_FILENO);
++        close(saved_in);
++    }
++    if (saved_out >= 0) {
++        dup2(saved_out, STDOUT_FILENO);
++        close(saved_out);
++    }
++    return status;
+ }
+ 
+ int execute_pipeline(Shell *sh, const Pipeline *pl)
+diff -ruN a/src/parser.c b/src/parser.c
+--- a/src/parser.c	2026-10-22 08:39:05.468715490 +0000
++++ b/src/parser.c	2026-10-22 08:40:32.369825540 +0000
+@@ -28,6 +28,7 @@
+ static int is_meta(char c)
+ {
+     return c == ';'
++        || c == '<' || c == '>'
+         ;
+ }
+ static int ends_word(char c){ return c == '\0' || c == '\n' || is_blank(c) ||
+@@ -234,6 +235,47 @@
+                 p++;
+             break;
+         }
++        if (c == '<' || c == '>') {
++            int append = 0;
++            char *target = NULL;
++            char op[3] = { c, '\0', '\0' };
++
++            p++;
++            if (c == '>' && *p == '>') {
++                append = 1;
++                op[1] = '>';
++                p++;
++            }
++            while (is_blank(*p))
++                p++;
++            if (ends_word(*p)) {
++                char msg[96];
++                snprintf(msg, sizeof msg,
++                         "syntax error: missing file name after '%s'", op);
++                fail(pl, &cur, cursor, errbuf, errlen, msg);
++                return PARSE_ERROR;
++            }
++            if (read_word(&p, last_status, &target, errbuf, errlen) < 0) {
++                fail(pl, &cur, cursor, errbuf, errlen, NULL);
++                return PARSE_ERROR;
++            }
++            if (target == NULL) {
++                fail(pl, &cur, cursor, errbuf, errlen,
++                     "ambiguous redirect (empty file name)");
++                return PARSE_ERROR;
++            }
++            if (c == '<') {
++                free(cur.infile);
++                cur.infile = target;
++            } else {
++                free(cur.outfile);
++                cur.outfile = target;
++                cur.append = append;
++            }
++            pipe_pending = 0;
++            continue;
++        }
++
+         /* ordinary word */
+         {
+             char *word = NULL;
+diff -ruN a/tests/enabled_tests.txt b/tests/enabled_tests.txt
+--- a/tests/enabled_tests.txt	2026-10-22 08:39:49.096529259 +0000
++++ b/tests/enabled_tests.txt	2026-10-22 08:41:16.296930249 +0000
+@@ -3,9 +3,11 @@
+ NF-03
+ NF-05
+ NF-06
++SC-03
+ SC-04
+ SC-05
+ SC-06
++SC-07
+ SC-09
+ SC-11
+ ST-01
+@@ -19,7 +21,13 @@
+ TC-04
+ TC-07
+ TC-10
++TC-11
++TC-12
++TC-13
++TC-14
++TC-15
+ TC-21
++TC-22
+ TC-31
+ TC-32
+ TC-33
+@@ -29,6 +37,7 @@
+ TC-39
+ TC-40
+ TC-41
++TC-44
+ TC-46
+ TC-47
+ TC-49
+@@ -40,6 +49,8 @@
+ TC-55
+ TC-62
+ TC-63
++TC-70
++TC-71
+ TC-72
+ TC-76
+ TC-77
+@@ -48,8 +59,13 @@
+ UT-04
+ UT-05
+ UT-06
++UT-08
++UT-09
+ UT-11
+ UT-12
+ UT-13
++UT-14
+ UT-18
+ UT-19
++UT-23
++UT-24

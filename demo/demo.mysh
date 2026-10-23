@@ -1,0 +1,21 @@
+# Simple Shell demonstration script  (run: ./mysh demo/demo.mysh)
+pwd
+echo Hello, Shell!
+mkdir -p demo_work
+cd demo_work
+pwd
+export NAME=Student
+echo Welcome $NAME
+echo first line > notes.txt
+echo second line >> notes.txt
+cat < notes.txt
+cat notes.txt | grep second
+ls | sort | head -n 3
+sleep 1 &
+echo background job started
+invalidcommand
+echo status was $?
+cd nosuchdir
+cd ..
+rm -rf demo_work
+exit

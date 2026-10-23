@@ -1,0 +1,183 @@
+diff -ruN a/src/executor.c b/src/executor.c
+--- a/src/executor.c	2026-10-22 08:44:53.457217060 +0000
++++ b/src/executor.c	2026-10-22 18:43:39.089242232 +0000
+@@ -61,18 +61,60 @@
+     return 0;
+ }
+ 
++/* ---- Background job table (Member 3) ----------------------------------- */
++
++static void jobs_add(Shell *sh, pid_t pid, const char *text)
++{
++    int id = sh->next_job_id++;
++
++    if (sh->njobs < MAX_JOBS) {
++        Job *j = &sh->jobs[sh->njobs++];
++        j->id = id;
++        j->pid = pid;
++        j->text = xstrdup(text);
++    }
++    if (sh->interactive)
++        fprintf(stderr, "[%d] %ld\n", id, (long)pid);
++}
++
++void jobs_reap(Shell *sh)
++{
++    int status;
++    pid_t pid;
++
++    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
++        int i;
++        for (i = 0; i < sh->njobs; i++) {
++            if (sh->jobs[i].pid != pid)
++                continue;
++            if (sh->interactive)
++                fprintf(stderr, "[%d]+  Done                    %s\n",
++                        sh->jobs[i].id, sh->jobs[i].text);
++            free(sh->jobs[i].text);
++            sh->jobs[i] = sh->jobs[sh->njobs - 1];
++            sh->njobs--;
++            break;
++        }
++    }
++    if (sh->njobs == 0)
++        sh->next_job_id = 1;
++}
+ 
+ /* ---- Child side (Member 1 / Member 3) ---------------------------------- */
+ 
+ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
+                        int background, int first)
+ {
+-    (void)background;
+-    (void)first;
+ 
+     if (in_fd >= 0) {
+         dup2(in_fd, STDIN_FILENO);
+         close(in_fd);
++    } else if (background && first && !c->infile) {
++        int nul = open("/dev/null", O_RDONLY);
++        if (nul >= 0) {
++            dup2(nul, STDIN_FILENO);
++            close(nul);
++        }
+     }
+     if (out_fd >= 0) {
+         dup2(out_fd, STDOUT_FILENO);
+@@ -229,7 +271,12 @@
+         return 1;
+     }
+ 
+-    status = wait_foreground(pids, n);
++    if (pl->background) {
++        jobs_add(sh, pids[n - 1], pl->text);
++        status = 0;
++    } else {
++        status = wait_foreground(pids, n);
++    }
+     free(pids);
+     return status;
+ }
+diff -ruN a/src/parser.c b/src/parser.c
+--- a/src/parser.c	2026-10-22 08:44:53.456989745 +0000
++++ b/src/parser.c	2026-10-22 18:43:39.088833460 +0000
+@@ -30,6 +30,7 @@
+     return c == ';'
+         || c == '|'
+         || c == '<' || c == '>'
++        || c == '&'
+         ;
+ }
+ static int ends_word(char c){ return c == '\0' || c == '\n' || is_blank(c) ||
+@@ -298,8 +299,17 @@
+             continue;
+         }
+         if (c == '\0' || c == '\n' || c == ';'
++            || c == '&'
+             ) {
+             end = p;
++            if (c == '&') {
++                if (p[1] == '&') {
++                    fail(pl, &cur, cursor, errbuf, errlen,
++                         "syntax error: '&&' is not supported");
++                    return PARSE_ERROR;
++                }
++                pl->background = 1;
++            }
+             terminator = c;
+             if (c != '\0')
+                 p++;
+diff -ruN a/src/shell.c b/src/shell.c
+--- a/src/shell.c	2026-10-22 08:44:53.457327087 +0000
++++ b/src/shell.c	2026-10-22 18:43:39.089454188 +0000
+@@ -86,6 +86,7 @@
+     while (sh->running) {
+         ssize_t n;
+ 
++        jobs_reap(sh);
+         if (sh->interactive)
+             print_prompt();
+ 
+diff -ruN a/tests/enabled_tests.txt b/tests/enabled_tests.txt
+--- a/tests/enabled_tests.txt	2026-10-22 08:45:38.690820219 +0000
++++ b/tests/enabled_tests.txt	2026-10-22 18:44:22.028012187 +0000
+@@ -1,8 +1,10 @@
+ NF-01
+ NF-02
+ NF-03
++NF-04
+ NF-05
+ NF-06
++NF-07
+ NF-08
+ SC-01
+ SC-02
+@@ -16,7 +18,9 @@
+ SC-11
+ ST-01
+ ST-02
++ST-05
+ ST-06
++ST-07
+ ST-08
+ ST-09
+ ST-10
+@@ -55,6 +59,7 @@
+ TC-33
+ TC-34
+ TC-35
++TC-36
+ TC-37
+ TC-38
+ TC-39
+@@ -63,6 +68,7 @@
+ TC-42
+ TC-43
+ TC-44
++TC-45
+ TC-46
+ TC-47
+ TC-48
+@@ -87,6 +93,8 @@
+ TC-71
+ TC-72
+ TC-73
++TC-74
++TC-75
+ TC-76
+ TC-77
+ UT-01
+@@ -98,11 +106,13 @@
+ UT-07
+ UT-08
+ UT-09
++UT-10
+ UT-11
+ UT-12
+ UT-13
+ UT-14
+ UT-15
++UT-16
+ UT-17
+ UT-18
+ UT-19

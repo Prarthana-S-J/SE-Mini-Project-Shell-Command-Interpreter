@@ -1,0 +1,95 @@
+TC-01 FR-09 SKIP pwd prints the working directory
+TC-02 FR-05 SKIP ls lists named files
+TC-03 FR-05 SKIP echo Hello prints its argument
+TC-10 FR-05 SKIP cat file.txt prints the file
+TC-30 FR-06 SKIP $? reflects exit status of false then true
+TC-56 FR-06 SKIP child killed by signal gives status 128+sig
+TC-04 FR-08 SKIP cd sub then cd .. returns to start
+TC-05 FR-08 SKIP cd to a missing directory reports an error
+TC-06 FR-08 SKIP cd with no argument goes to $HOME
+TC-07 FR-08 SKIP cd - returns to previous directory and prints it
+TC-65 FR-08 SKIP cd with too many arguments fails
+TC-08 FR-07 SKIP unknown command -> 127 and message
+TC-09 FR-07 SKIP non-executable file -> 126 and message
+TC-66 FR-07 SKIP missing path with slash -> No such file
+TC-11 FR-16 SKIP cat < input.txt reads stdin from file
+TC-12 FR-14 SKIP echo hello > output.txt creates the file
+TC-13 FR-14 SKIP > truncates an existing file
+TC-14 FR-15 SKIP >> appends to an existing file
+TC-15 FR-15 SKIP >> creates the file when absent
+TC-16 FR-17 SKIP < missing file: error, status 1, no crash
+TC-17 FR-17 SKIP > into a missing directory: error, status 1
+TC-70 FR-04 SKIP redirection with no command is rejected
+TC-71 FR-14 SKIP spaces around > are optional
+TC-18 FR-18 SKIP cat file.txt | grep hello
+TC-19 FR-18 SKIP three-stage pipeline printf | sort | uniq
+TC-20 FR-18 SKIP pipeline combined with < and >
+TC-21 FR-18 SKIP built-in inside a pipeline (pwd | cat)
+TC-22 FR-14 SKIP built-in with output redirection (pwd > f)
+TC-57 FR-18 SKIP ten-stage pipeline
+TC-58 FR-18 SKIP failing first stage does not hang the pipeline
+TC-23 FR-12 SKIP export then $VAR
+TC-24 FR-12 SKIP exported variable is visible to child processes
+TC-25 FR-12 SKIP NAME=VALUE assignment then $NAME
+TC-26 FR-12 SKIP unset removes a variable
+TC-27 FR-12 SKIP env lists exported variables
+TC-28 FR-13 SKIP ${NAME} form
+TC-29 FR-13 SKIP unset variable expands to nothing (word dropped)
+TC-60 FR-13 SKIP ~ expands to $HOME
+TC-64 FR-12 SKIP export with invalid identifier fails
+TC-38 FR-13 SKIP double quotes allow expansion
+TC-72 FR-13 SKIP single quotes suppress expansion
+TC-61 FR-13 SKIP $$ expands to a numeric PID
+TC-31 FR-10 SKIP exit N returns status N
+TC-32 FR-10 SKIP exit stops further commands
+TC-33 FR-10 SKIP exit with non-numeric argument -> status 2
+TC-34 FR-11 SKIP help lists the built-in commands
+TC-35 FR-19 SKIP ; runs commands in order
+TC-37 FR-03 SKIP double quotes preserve inner spaces
+TC-39 FR-03 SKIP backslash escapes a space
+TC-40 FR-03 SKIP comment is ignored
+TC-41 FR-04 SKIP unterminated quote -> syntax error, status 2
+TC-42 FR-04 SKIP leading | is a syntax error
+TC-43 FR-04 SKIP trailing | is a syntax error
+TC-44 FR-04 SKIP redirection without file name
+TC-45 FR-04 SKIP && is reported as unsupported
+TC-46 FR-04 SKIP syntax error discards rest of line
+TC-47 FR-01 SKIP blank / whitespace-only input does nothing
+TC-73 FR-04 SKIP || is reported as unsupported
+TC-48 FR-05 SKIP PATH lookup finds a user-added directory
+TC-49 FR-05 SKIP relative path with / bypasses PATH
+TC-36 FR-20 SKIP 'sleep 2 &' returns immediately
+TC-74 FR-20 SKIP background pipeline does not block the shell
+TC-75 FR-20 SKIP background command with redirection completes its work
+TC-50 FR-02 SKIP script file argument is executed
+TC-51 FR-02 SKIP commands can be piped to the shell on stdin (no prompt)
+TC-52 FR-22 SKIP EOF on stdin ends the shell with the last command's status
+TC-53 FR-10 SKIP exit inside a script stops the script
+TC-62 FR-02 SKIP '-c' without an argument -> usage error (status 2)
+TC-63 FR-02 SKIP missing script file -> status 127
+TC-76 FR-02 PASS --version prints the version
+TC-54 NFR-02 SKIP command with 2000 arguments
+TC-55 NFR-02 SKIP single 100000-character argument
+TC-77 NFR-02 SKIP 300 consecutive pipelines (no fd/process leak)
+SC-01 SR-01 SKIP metacharacters inside quotes are passed literally; no injection
+SC-02 SR-02 SKIP operators inside a variable value are not re-interpreted
+SC-03 SR-01 SKIP file names containing metacharacters are used literally
+SC-04 SR-01 PASS source contains no system()/popen()/sh -c invocation
+SC-05 SR-03 SKIP shell never changes uid/gid; children run as the invoking user
+SC-06 SR-04 PASS shell writes no history/log/state files of its own
+SC-07 SR-05 SKIP created files are never more permissive than 0644 and honour the umask
+SC-08 SR-07 SKIP invalid variable names are rejected and the environment is unchanged
+SC-09 SR-08 SKIP executed programs inherit no descriptors beyond 0,1,2 after 300 pipelines
+SC-10 SR-08 SKIP script file descriptor is not inherited by executed programs
+SC-11 SR-10 SKIP background jobs cannot read the shell's standard input
+NF-01 NFR-01 FAIL background start returns in <= 500 ms
+      -> took 593 ms
+NF-02 NFR-01 PASS 1000 external commands in <= 5 s (measured 432 ms, mean 432 us)
+NF-03 NFR-01 PASS 1000 built-in commands in <= 1 s (measured 416 ms)
+NF-04 NFR-03 SKIP diagnostics use the 'mysh: <reason>' format
+NF-05 NFR-04 PASS all 6 source files compile with 0 warnings under -Wall -Wextra -Wpedantic -Werror
+NF-06 NFR-05 PASS sources also compile as C99 + POSIX.1-2008 (no GNU-only language extensions)
+NF-07 NFR-09 SKIP shell survives 10 consecutive faulty lines and still executes the next command
+NF-08 NFR-03 SKIP help fits one screen and lists all 7 built-ins
+ST-10 FR-01..FR-22 SKIP demo/demo.mysh runs end to end and produces the documented output
+FUNCTIONAL SUMMARY: 8 run, 7 passed, 1 failed, 85 skipped (not implemented yet)

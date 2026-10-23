@@ -1,0 +1,23 @@
+diff -ruN a/src/main.c b/src/main.c
+--- a/src/main.c	2026-10-22 18:45:03.990887814 +0000
++++ b/src/main.c	2026-10-22 18:45:42.348626815 +0000
+@@ -44,7 +44,7 @@
+         shell_execute_line(&sh, argv[2]);
+         rc = sh.running ? sh.last_status : sh.exit_code;
+     } else if (argc >= 2) {
+-        FILE *f = fopen(argv[1], "r");
++        FILE *f = fopen(argv[1], "re");   /* "e": close-on-exec, children must not inherit the script fd */
+         if (!f) {
+             shell_error("%s: cannot open script file", argv[1]);
+             return 127;
+diff -ruN a/tests/enabled_tests.txt b/tests/enabled_tests.txt
+--- a/tests/enabled_tests.txt	2026-10-22 18:45:23.339396108 +0000
++++ b/tests/enabled_tests.txt	2026-10-22 18:46:01.649912616 +0000
+@@ -15,6 +15,7 @@
+ SC-07
+ SC-08
+ SC-09
++SC-10
+ SC-11
+ ST-01
+ ST-02
