@@ -1,0 +1,104 @@
+diff -ruN a/src/main.c b/src/main.c
+--- a/src/main.c	2026-10-22 08:35:53.047804862 +0000
++++ b/src/main.c	2026-10-22 08:37:27.006750768 +0000
+@@ -7,17 +7,56 @@
+  *         mysh script.sh       run commands from a file
+  */
+ #include <stdio.h>
++#include <string.h>
+ 
+ #include "shell.h"
++#include "utils.h"
+ 
+-int main(void)
++static void usage(FILE *out)
++{
++    fprintf(out, "Usage: %s [-c command | script_file]\n"
++                 "       %s -h | --help | --version\n", SHELL_NAME, SHELL_NAME);
++}
++
++int main(int argc, char **argv)
+ {
+     Shell sh;
+     int rc;
+ 
++    if (argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
++        usage(stdout);
++        return 0;
++    }
++    if (argc >= 2 && strcmp(argv[1], "--version") == 0) {
++        printf("%s %s\n", SHELL_NAME, SHELL_VERSION);
++        return 0;
++    }
++
+     shell_init(&sh);
+-    shell_setup_signals(&sh);
+-    rc = shell_run_stream(&sh, stdin);
++
++    if (argc >= 2 && strcmp(argv[1], "-c") == 0) {
++        if (argc < 3) {
++            fprintf(stderr, "%s: -c requires an argument\n", SHELL_NAME);
++            usage(stderr);
++            return 2;
++        }
++        sh.interactive = 0;
++        shell_execute_line(&sh, argv[2]);
++        rc = sh.running ? sh.last_status : sh.exit_code;
++    } else if (argc >= 2) {
++        FILE *f = fopen(argv[1], "r");
++        if (!f) {
++            shell_error("%s: cannot open script file", argv[1]);
++            return 127;
++        }
++        sh.interactive = 0;
++        rc = shell_run_stream(&sh, f);
++        fclose(f);
++    } else {
++        shell_setup_signals(&sh);
++        rc = shell_run_stream(&sh, stdin);
++    }
++
+     shell_cleanup(&sh);
+     return rc;
+ }
+diff -ruN a/tests/enabled_tests.txt b/tests/enabled_tests.txt
+--- a/tests/enabled_tests.txt	2026-10-22 08:36:40.194691359 +0000
++++ b/tests/enabled_tests.txt	2026-10-22 08:38:16.238556248 +0000
+@@ -4,15 +4,37 @@
+ NF-05
+ NF-06
+ SC-04
++SC-05
+ SC-06
++SC-09
+ SC-11
+ ST-01
+ ST-02
+ ST-06
+ ST-08
++TC-01
++TC-02
++TC-03
++TC-10
++TC-21
++TC-35
++TC-37
++TC-39
++TC-40
++TC-41
++TC-46
+ TC-47
++TC-49
++TC-50
+ TC-51
+ TC-52
++TC-54
++TC-55
++TC-62
++TC-63
++TC-72
++TC-76
++TC-77
+ UT-01
+ UT-02
+ UT-04

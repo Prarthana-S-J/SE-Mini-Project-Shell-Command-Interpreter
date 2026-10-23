@@ -1,0 +1,57 @@
+ID,Title,Type,Requirement,Epic,Component,Priority,Story Points,Sprint,Owner,Tests,Source files
+CH-01,CH-01 Create the GitHub repository and push the project skeleton,chore,,Project setup and delivery,build,high,2,Sprint 0 (dry run),Member 4,,
+CH-02,CH-02 Create the GitHub Project board and link it to the repo,chore,,Project setup and delivery,build,high,2,Sprint 0 (dry run),Member 1,,
+CH-03,"CH-03 Import the backlog as labelled, assigned, pointed issues",chore,,Project setup and delivery,build,high,3,Sprint 0 (dry run),Member 4,,
+CH-04,"CH-04 Add PR template, CODEOWNERS and branch rules",chore,,Project setup and delivery,build,high,1,Sprint 0 (dry run),Member 2,,
+CH-05,CH-05 Dry run: every member raises one practice PR,chore,,Project setup and delivery,docs,high,1,Sprint 0 (dry run),Member 3,,
+CH-06,CH-06 Dry run: record a 30-second practice screen capture,chore,,Project setup and delivery,docs,high,1,Sprint 0 (dry run),Member 1,,
+CH-07,"CH-07 Enable GitHub Actions: build, tests, sanitizer, PR checks",chore,,Project setup and delivery,build,high,3,Sprint 1,Member 3,,
+CH-08,CH-08 Parser unit-test suite (UT-01 to UT-24) in the repo,chore,,Project setup and delivery,tests,high,3,Sprint 1,Member 2,,
+CH-09,CH-09 Functional test harness (run_tests.sh) for sprint-1 features,chore,,Project setup and delivery,tests,high,5,Sprint 1,Member 3,,
+CH-10,CH-10 Utilities module and uniform error format (utils.c/h),chore,,Project setup and delivery,utils,high,3,Sprint 1,Member 4,,
+CH-11,CH-11 Record and upload the Sprint-1 video (1 minute),chore,,Project setup and delivery,docs,high,2,Sprint 1,Member 4,,
+CH-15,CH-15 Integration check at the end of Sprint 1,chore,,Project setup and delivery,build,high,1,Sprint 1,Member 1,,
+FR-01,FR-01 Interactive prompt and read-eval loop,feature,FR-01,Command Loop and Input Sources,parser,high,5,Sprint 1,Member 1,"TC-47, UT-18","shell.c, parser.c"
+FR-02,FR-02 Non-interactive input sources,feature,FR-02,Command Loop and Input Sources,shell,high,3,Sprint 1,Member 1,"TC-50, TC-51, TC-62, TC-63, TC-76","main.c, shell.c"
+FR-03,FR-03 Tokenization and quoting,feature,FR-03,Command-Line Parsing,parser,high,8,Sprint 1,Member 2,"TC-37, TC-39, TC-40, UT-01, UT-02, UT-05, UT-06",parser.c
+FR-04,FR-04 Syntax error detection and reporting,feature,FR-04,Command-Line Parsing,parser,high,5,Sprint 1,Member 4,"TC-41, TC-42, TC-43, TC-44, TC-45, TC-46, TC-70, TC-73, UT-12, UT-13, UT-14, UT-15, UT-16, UT-22, UT-23","parser.c, shell.c"
+FR-05,FR-05 External command execution with PATH search,feature,FR-05,External Command Execution,executor,high,5,Sprint 1,Member 1,"TC-02, TC-03, TC-10, TC-48, TC-49",executor.c
+FR-06,FR-06 Foreground wait and exit status,feature,FR-06,External Command Execution,executor,high,3,Sprint 1,Member 1,"TC-30, TC-56",executor.c
+FR-07,FR-07 Invalid command handling,feature,FR-07,External Command Execution,executor,high,3,Sprint 1,Member 4,"TC-08, TC-09, TC-66",executor.c
+FR-08,FR-08 Built-in cd,feature,FR-08,Built-in Commands,builtins,high,3,Sprint 1,Member 2,"TC-04, TC-05, TC-06, TC-07, TC-65",builtins.c
+FR-09,FR-09 Built-in pwd,feature,FR-09,Built-in Commands,builtins,high,1,Sprint 1,Member 2,TC-01,builtins.c
+FR-10,FR-10 Built-in exit,feature,FR-10,Built-in Commands,builtins,high,2,Sprint 1,Member 4,"TC-31, TC-32, TC-33, TC-53",builtins.c
+FR-11,FR-11 Built-in help,feature,FR-11,Built-in Commands,builtins,medium,2,Sprint 1,Member 4,TC-34,builtins.c
+FR-14,FR-14 Output redirection >,feature,FR-14,I/O Redirection,executor,high,3,Sprint 1,Member 3,"TC-12, TC-13, TC-22, TC-71, UT-08, UT-24",executor.c
+FR-15,FR-15 Append redirection >>,feature,FR-15,I/O Redirection,executor,high,2,Sprint 1,Member 3,"TC-14, TC-15, UT-09",executor.c
+FR-16,FR-16 Input redirection <,feature,FR-16,I/O Redirection,executor,high,2,Sprint 1,Member 3,TC-11,executor.c
+FR-17,FR-17 Redirection error handling,feature,FR-17,I/O Redirection,executor,high,3,Sprint 1,Member 4,"TC-16, TC-17",executor.c
+FR-19,FR-19 Command sequencing with ;,feature,FR-19,Pipelines and Sequencing,parser,medium,2,Sprint 1,Member 1,"TC-35, UT-11","shell.c, parser.c"
+FR-22,FR-22 Graceful termination,feature,FR-22,Command Loop and Input Sources,builtins,high,2,Sprint 1,Member 1,TC-52,"shell.c, builtins.c"
+CH-12,CH-12 Record and upload the Sprint-2 video (2 minutes),chore,,Project setup and delivery,docs,high,2,Sprint 2,Member 2,,
+CH-13,CH-13 Complete documentation and record deviations from submitted documents,chore,,Project setup and delivery,docs,high,5,Sprint 2,Member 4,,
+CH-14,CH-14 Review and integrate all PRs; final regression and release tag,chore,,Project setup and delivery,build,high,3,Sprint 2,Member 1,,
+FR-12,FR-12 Environment variables,feature,FR-12,Environment and Expansion,executor,high,5,Sprint 2,Member 2,"TC-23, TC-24, TC-25, TC-26, TC-27, TC-64, UT-19","builtins.c, executor.c, utils.c"
+FR-13,FR-13 Variable and tilde expansion,feature,FR-13,Environment and Expansion,parser,high,5,Sprint 2,Member 2,"TC-28, TC-29, TC-38, TC-60, TC-61, TC-72, UT-03, UT-04, UT-17, UT-20, UT-21",parser.c
+FR-18,FR-18 Pipelines,feature,FR-18,Pipelines and Sequencing,executor,high,8,Sprint 2,Member 3,"TC-18, TC-19, TC-20, TC-21, TC-57, TC-58, UT-07",executor.c
+FR-20,FR-20 Background execution with &,feature,FR-20,Background Execution,executor,high,5,Sprint 2,Member 3,"TC-36, TC-74, TC-75, UT-10",executor.c
+FR-21,FR-21 Signal handling,feature,FR-21,Signal Handling,executor,high,5,Sprint 2,Member 3,,"shell.c, executor.c"
+SR-01,SR-01 Prevent command and argument injection (SO-1),security,SR-01,Security,parser,high,3,Sprint 2,Member 2,"SC-01, SC-03, SC-04","parser.c, executor.c"
+SR-02,SR-02 Prevent command and argument injection (SO-1),security,SR-02,Security,parser,high,2,Sprint 2,Member 2,SC-02,parser.c
+SR-03,SR-03 Prevent privilege escalation (SO-2),security,SR-03,Security,executor,high,1,Sprint 2,Member 1,SC-05,executor.c
+SR-04,SR-04 Protect user data from unintended disclosure (SO-3),security,SR-04,Security,executor,medium,1,Sprint 2,Member 1,SC-06,"shell.c, executor.c"
+SR-05,SR-05 Protect user data from unintended disclosure (SO-3),security,SR-05,Security,executor,medium,2,Sprint 2,Member 1,SC-07,executor.c
+SR-06,SR-06 Remain memory-safe and robust against hostile input (SO-4),security,SR-06,Security,parser,high,5,Sprint 2,Member 4,"SC-12, SC-13","parser.c, utils.c"
+SR-07,SR-07 Remain memory-safe and robust against hostile input (SO-4),security,SR-07,Security,executor,medium,2,Sprint 2,Member 2,SC-08,"builtins.c, executor.c, utils.c"
+SR-08,SR-08 Prevent resource leakage and loss of control (SO-5),security,SR-08,Security,executor,high,3,Sprint 2,Member 3,"SC-09, SC-10","main.c, executor.c"
+SR-09,SR-09 Prevent resource leakage and loss of control (SO-5),security,SR-09,Security,executor,high,2,Sprint 2,Member 4,-,"shell.c, executor.c"
+SR-10,SR-10 Prevent resource leakage and loss of control (SO-5),security,SR-10,Security,executor,medium,2,Sprint 2,Member 3,SC-11,executor.c
+NFR-01,NFR-01 Performance,nfr,NFR-01,Non-functional,executor,high,3,Sprint 2,Member 1,"NF-01, NF-02, NF-03",executor.c
+NFR-02,NFR-02 Robustness,nfr,NFR-02,Non-functional,parser,high,3,Sprint 2,Member 4,"SC-12, SC-13, TC-54, TC-55, TC-57, TC-77","parser.c, executor.c"
+NFR-03,NFR-03 Usability,nfr,NFR-03,Non-functional,builtins,high,2,Sprint 2,Member 4,"NF-04, NF-08, TC-34","shell.c, builtins.c"
+NFR-04,NFR-04 Maintainability,nfr,NFR-04,Non-functional,build,high,2,Sprint 2,Member 1,NF-05,"all modules, Makefile"
+NFR-05,NFR-05 Portability,nfr,NFR-05,Non-functional,build,high,2,Sprint 2,Member 1,NF-06,all (POSIX interfaces)
+NFR-06,NFR-06 Security,nfr,NFR-06,Non-functional,executor,high,3,Sprint 2,Member 4,"SC-01, SC-02, SC-03, SC-04, SC-05, SC-06, SC-07, SC-08, SC-09, SC-10, SC-11, SC-12, SC-13",executor.c
+NFR-07,NFR-07 Testability,nfr,NFR-07,Non-functional,parser,high,2,Sprint 2,Member 1,"TC-50, TC-51, TC-62","main.c, parser.c"
+NFR-08,NFR-08 Memory safety and resource management,nfr,NFR-08,Non-functional,parser,high,3,Sprint 2,Member 4,"SC-09, TC-77","parser.c, executor.c, utils.c"
+NFR-09,NFR-09 Reliability,nfr,NFR-09,Non-functional,executor,high,2,Sprint 2,Member 2,"NF-07, TC-05, TC-08, TC-16, TC-17, TC-41","shell.c, executor.c"

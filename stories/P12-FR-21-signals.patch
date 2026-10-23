@@ -1,0 +1,120 @@
+diff -ruN a/src/executor.c b/src/executor.c
+--- a/src/executor.c	2026-10-22 18:43:39.089242232 +0000
++++ b/src/executor.c	2026-10-22 18:45:03.991536831 +0000
+@@ -105,6 +105,9 @@
+ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
+                        int background, int first)
+ {
++    /* Foreground children take the default SIGINT action; background children
++     * ignore it so Ctrl+C at the terminal does not kill them. */
++    signal(SIGINT, background ? SIG_IGN : SIG_DFL);
+ 
+     if (in_fd >= 0) {
+         dup2(in_fd, STDIN_FILENO);
+@@ -147,6 +150,7 @@
+ static int wait_foreground(const pid_t *pids, int n)
+ {
+     int i, status = 0, last_status = 0;
++    int saw_sigint = 0;
+ 
+     for (i = 0; i < n; i++) {
+         while (waitpid(pids[i], &status, 0) < 0) {
+@@ -155,11 +159,18 @@
+             status = 0;
+             break;
+         }
++        if (WIFSIGNALED(status) && WTERMSIG(status) == SIGINT)
++            saw_sigint = 1;
+         if (i == n - 1)
+             last_status = status;
+     }
+-    if (WIFSIGNALED(last_status) && WTERMSIG(last_status) != SIGPIPE)
++    g_sigint_flag = 0;
++
++    if (saw_sigint) {
++        fputc('\n', stderr);
++    } else if (WIFSIGNALED(last_status) && WTERMSIG(last_status) != SIGPIPE) {
+         fprintf(stderr, "%s\n", strsignal(WTERMSIG(last_status)));
++    }
+     if (WIFEXITED(last_status))
+         return WEXITSTATUS(last_status);
+     if (WIFSIGNALED(last_status))
+diff -ruN a/src/shell.c b/src/shell.c
+--- a/src/shell.c	2026-10-22 18:43:39.089454188 +0000
++++ b/src/shell.c	2026-10-22 18:45:03.991647609 +0000
+@@ -24,6 +24,11 @@
+ 
+ volatile sig_atomic_t g_sigint_flag = 0;
+ 
++static void sigint_handler(int sig)
++{
++    (void)sig;
++    g_sigint_flag = 1;   /* only set a flag: async-signal-safe */
++}
+ 
+ void shell_init(Shell *sh)
+ {
+@@ -43,7 +48,27 @@
+ 
+ void shell_setup_signals(const Shell *sh)
+ {
+-    (void)sh;       /* Ctrl+C handling is added by story FR-21 */
++    struct sigaction sa;
++
++    if (!sh->interactive)
++        return;
++
++    /* Ctrl+C: interrupt the current input line / foreground job, but never
++     * terminate the shell. SA_RESTART is deliberately NOT set so that a
++     * blocked read() on the prompt returns EINTR and the prompt is redrawn. */
++    memset(&sa, 0, sizeof sa);
++    sa.sa_handler = sigint_handler;
++    sigemptyset(&sa.sa_mask);
++    sa.sa_flags = 0;
++    sigaction(SIGINT, &sa, NULL);
++
++    /* Ctrl+\ and Ctrl+Z are ignored: the shell has no job control, so a
++     * stopped child could never be resumed. Ignored signals are inherited
++     * across exec, which gives foreground children the same protection. */
++    signal(SIGQUIT, SIG_IGN);
++    signal(SIGTSTP, SIG_IGN);
++    signal(SIGTTOU, SIG_IGN);
++    signal(SIGTTIN, SIG_IGN);
+ }
+ 
+ int shell_execute_line(Shell *sh, const char *line)
+@@ -93,6 +118,15 @@
+         errno = 0;
+         n = getline(&line, &cap, in);
+         if (n < 0) {
++            if (errno == EINTR) {            /* Ctrl+C at the prompt */
++                clearerr(in);
++                if (g_sigint_flag) {
++                    g_sigint_flag = 0;
++                    sh->last_status = 130;
++                }
++                fputc('\n', stderr);
++                continue;
++            }
+             if (sh->interactive)
+                 fputs("exit\n", stderr);     /* Ctrl+D */
+             break;
+diff -ruN a/tests/enabled_tests.txt b/tests/enabled_tests.txt
+--- a/tests/enabled_tests.txt	2026-10-22 18:44:22.028012187 +0000
++++ b/tests/enabled_tests.txt	2026-10-22 18:45:23.339396108 +0000
+@@ -18,12 +18,15 @@
+ SC-11
+ ST-01
+ ST-02
++ST-03
++ST-04
+ ST-05
+ ST-06
+ ST-07
+ ST-08
+ ST-09
+ ST-10
++ST-11
+ TC-01
+ TC-02
+ TC-03
