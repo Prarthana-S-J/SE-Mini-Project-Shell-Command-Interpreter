@@ -28,6 +28,7 @@
 
 /* ---- Child side (Member 1 / Member 3) ---------------------------------- */
 
+
 static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
                        int background, int first)
 {
@@ -36,14 +37,20 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
     (void)sh;
 
     if (in_fd >= 0) {
-        dup2(in_fd, STDIN_FILENO);
+        if (dup2(in_fd, STDIN_FILENO) == -1) {
+            shell_error("stdin redirection: %s", strerror(errno));
+            _exit(126);
+        }
         close(in_fd);
     }
+
     if (out_fd >= 0) {
-        dup2(out_fd, STDOUT_FILENO);
+        if (dup2(out_fd, STDOUT_FILENO) == -1) {
+            shell_error("stdout redirection: %s", strerror(errno));
+            _exit(126);
+        }
         close(out_fd);
     }
-
 
     execvp(c->argv[0], c->argv);
 
@@ -54,9 +61,11 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
             shell_error("%s: command not found", c->argv[0]);
         _exit(127);
     }
+
     shell_error("%s: %s", c->argv[0], strerror(errno));
     _exit(126);
 }
+
 
 /* ---- Parent side ------------------------------------------------------- */
 
