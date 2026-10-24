@@ -1,11 +1,13 @@
 # Simple Shell (mysh) - build system
 CC      ?= gcc
+AR      ?= ar
 CFLAGS  ?= -std=c11 -Wall -Wextra -Wpedantic -O2 -g
 CPPFLAGS += -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE
 
 SRC_DIR   := src
 BUILD_DIR := build
 TARGET    := mysh
+PARSER_LIB := $(BUILD_DIR)/libmysh_parser.a
 
 SRCS := $(filter-out $(SRC_DIR)/main.c,$(wildcard $(SRC_DIR)/*.c))
 OBJS := $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
@@ -13,7 +15,7 @@ MAIN := $(BUILD_DIR)/main.o
 
 .PHONY: all clean test unit-test sanitize fuzz run
 
-all: $(TARGET)
+all: $(TARGET) $(PARSER_LIB)
 
 $(TARGET): $(OBJS) $(MAIN)
 	$(CC) $(CFLAGS) -o $@ $^
@@ -24,9 +26,15 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(wildcard $(SRC_DIR)/*.h) | $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir -p $@
 
+$(BUILD_DIR)/parser_api.o: parser.c parser.h | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(PARSER_LIB): $(BUILD_DIR)/parser_api.o
+	$(AR) rcs $@ $^
+
 # Parser/utility unit tests (Member 4)
-$(BUILD_DIR)/test_parser: tests/test_parser.c $(OBJS) | $(BUILD_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(SRC_DIR) -o $@ $^
+$(BUILD_DIR)/test_parser: tests/test_parser.c parser.c parser.h $(OBJS) | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(SRC_DIR) -o $@ tests/test_parser.c parser.c $(OBJS)
 
 ifneq ($(wildcard $(SRC_DIR)/parser.c),)
 unit-test: $(BUILD_DIR)/test_parser
