@@ -107,6 +107,7 @@ t TC-65 FR-08 "cd with too many arguments fails"                'cd a b; echo $?
 t TC-08 FR-07 "unknown command -> 127 and message"              'invalidcommand; echo $?' '127' 0 'command not found'
 t TC-09 FR-07 "non-executable file -> 126 and message"          './noexec.sh; echo $?' '126' 0 'Permission denied'
 t TC-66 FR-07 "missing path with slash -> No such file"         './nothere; echo $?' '127' 0 'No such file or directory'
+t TC-67 FR-07 "directory cannot be executed -> 126 and message" './sub; echo $?' '126' 0 'Permission denied'
 
 # ---- Redirection (FR-14..FR-17) ---------------------------------------------
 t TC-11 FR-16 "cat < input.txt reads stdin from file"           'cat < input.txt' 'from input'
