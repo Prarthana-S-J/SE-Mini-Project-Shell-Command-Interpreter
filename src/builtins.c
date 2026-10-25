@@ -1,0 +1,110 @@
+/*
+ * builtins.c - cd and pwd built-in commands.
+ * Owner: Member 2 (Built-in commands, environment handling)
+ */
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
+
+#include "builtins.h"
+
+#include <errno.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "utils.h"
+
+static int bi_cd(int argc, char **argv)
+{
+    const char *target;
+    char oldcwd[PATH_MAX];
+    char newcwd[PATH_MAX];
+    int print_dir = 0;
+
+    if (argc > 2) {
+        shell_error("cd: too many arguments");
+        return 1;
+    }
+
+    if (argc == 1) {
+        target = getenv("HOME");
+        if (target == NULL || *target == '\0') {
+            shell_error("cd: HOME not set");
+            return 1;
+        }
+    } else if (strcmp(argv[1], "-") == 0) {
+        target = getenv("OLDPWD");
+        if (target == NULL || *target == '\0') {
+            shell_error("cd: OLDPWD not set");
+            return 1;
+        }
+        print_dir = 1;
+    } else {
+        target = argv[1];
+    }
+
+    if (getcwd(oldcwd, sizeof oldcwd) == NULL)
+        oldcwd[0] = '\0';
+
+    if (chdir(target) != 0) {
+        shell_error("cd: %s: %s", target, strerror(errno));
+        return 1;
+    }
+
+    if (oldcwd[0] != '\0' && setenv("OLDPWD", oldcwd, 1) != 0) {
+        shell_error("cd: cannot update OLDPWD: %s", strerror(errno));
+        return 1;
+    }
+
+    if (getcwd(newcwd, sizeof newcwd) != NULL) {
+        if (setenv("PWD", newcwd, 1) != 0) {
+            shell_error("cd: cannot update PWD: %s", strerror(errno));
+            return 1;
+        }
+
+        if (print_dir)
+            printf("%s\n", newcwd);
+    }
+
+    return 0;
+}
+
+static int bi_pwd(void)
+{
+    char cwd[PATH_MAX];
+
+    if (getcwd(cwd, sizeof cwd) == NULL) {
+        shell_error("pwd: %s", strerror(errno));
+        return 1;
+    }
+
+    printf("%s\n", cwd);
+    return 0;
+}
+
+int is_builtin(const char *name)
+{
+    return strcmp(name, "cd") == 0 || strcmp(name, "pwd") == 0;
+}
+
+int run_builtin(Shell *sh, int argc, char **argv)
+{
+    (void)sh;
+
+    if (argc == 0 || argv == NULL || argv[0] == NULL)
+        return 1;
+
+    if (strcmp(argv[0], "cd") == 0)
+        return bi_cd(argc, argv);
+
+    if (strcmp(argv[0], "pwd") == 0)
+        return bi_pwd();
+
+    return 127;
+}
