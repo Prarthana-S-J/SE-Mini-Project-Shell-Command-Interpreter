@@ -7,7 +7,7 @@ Ctrl+C, Ctrl+D, Ctrl+Z and background-job notifications.  (Member 4 / Member 3)
 Usage:  python3 tests/interactive_test.py      (after `make`)
 Output line format:  <ID> <REQ> PASS|FAIL <description>
 """
-import os, pty, re, select, signal, sys, tempfile, time
+import os, pty, re, select, shutil, signal, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MYSH = os.environ.get("MYSH", os.path.join(ROOT, "mysh"))
@@ -193,6 +193,28 @@ def test_exit_status():
     s.kill()
 
 
+def test_invalid_command_returns_prompt():
+    s = Session()
+    command = "mysh-fr07-command-does-not-exist"
+    diagnostic = f"mysh: {command}: command not found".encode()
+    try:
+        s.read_until(PROMPT)
+        s.send(command + "\n")
+        failed = s.read_until(PROMPT)
+        error_count = failed.count(diagnostic) if failed is not None else 0
+
+        s.send("echo fr07-shell-alive\n")
+        continued = s.read_until(PROMPT)
+        ok = error_count == 1 and continued is not None and \
+            b"fr07-shell-alive" in continued
+        record("ST-12", "FR-07", ok,
+               "failed command reports once, returns to the prompt, and shell continues",
+               f"failed={failed!r} continued={continued!r}")
+    finally:
+        s.kill()
+        shutil.rmtree(s.cwd)
+
+
 def test_bg_survives_shell_signal_isolation():
     """A background job must not be killed by Ctrl+C sent while a foreground job runs."""
     s = Session(); s.read_until(PROMPT)
@@ -213,6 +235,7 @@ def test_bg_survives_shell_signal_isolation():
 FUNC_IDS = {"test_prompt": ("ST-01", "ST-02"), "test_ctrl_c_prompt": ("ST-03",), "test_ctrl_c_foreground": ("ST-04",),
             "test_background": ("ST-05",), "test_ctrl_d": ("ST-06",), "test_bg_survives_ctrl_c": ("ST-07",),
             "test_ctrl_z_ignored": ("ST-08",), "test_exit_status": ("ST-09",),
+            "test_invalid_command_returns_prompt": ("ST-12",),
             "test_bg_survives_shell_signal_isolation": ("ST-11",)}
 
 if __name__ == "__main__":
@@ -222,6 +245,7 @@ if __name__ == "__main__":
     print("== Interactive (pseudo-terminal) system tests for mysh ==")
     for fn in (test_prompt, test_ctrl_c_prompt, test_ctrl_c_foreground, test_background,
                test_ctrl_d, test_bg_survives_ctrl_c, test_ctrl_z_ignored, test_exit_status,
+               test_invalid_command_returns_prompt,
                test_bg_survives_shell_signal_isolation):
         try:
             fn()
