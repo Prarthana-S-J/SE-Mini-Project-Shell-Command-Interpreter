@@ -1,3 +1,4 @@
+
 /*
  * executor.c - fork/exec, redirection, pipelines, background jobs.
  * Owner: Member 1 (process creation, wait, exit status)
@@ -23,11 +24,6 @@
 
 #include "builtins.h"
 #include "utils.h"
-
-
-
-/* ---- Child side (Member 1 / Member 3) ---------------------------------- */
-
 
 static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
                        int background, int first)
@@ -66,42 +62,50 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
     _exit(126);
 }
 
-
-/* ---- Parent side ------------------------------------------------------- */
-
 static int wait_foreground(const pid_t *pids, int n)
 {
     int i, status = 0, last_status = 0;
+    int wait_failed = 0;
 
     for (i = 0; i < n; i++) {
-        while (waitpid(pids[i], &status, 0) < 0) {
-            if (errno == EINTR)
-                continue;
-            status = 0;
-            break;
+        pid_t result;
+
+        do {
+            result = waitpid(pids[i], &status, 0);
+        } while (result < 0 && errno == EINTR);
+
+        if (result < 0) {
+            shell_error("waitpid: %s", strerror(errno));
+            wait_failed = 1;
+            continue;
         }
+
         if (i == n - 1)
             last_status = status;
     }
+
+    if (wait_failed)
+        return 1;
+
     if (WIFSIGNALED(last_status) && WTERMSIG(last_status) != SIGPIPE)
         fprintf(stderr, "%s\n", strsignal(WTERMSIG(last_status)));
+
     if (WIFEXITED(last_status))
         return WEXITSTATUS(last_status);
+
     if (WIFSIGNALED(last_status))
         return 128 + WTERMSIG(last_status);
+
     return 1;
 }
-
-
 
 int execute_pipeline(Shell *sh, const Pipeline *pl)
 {
     int n = pl->ncmds, i, prev_read = -1, forked = 0, status;
     pid_t *pids;
 
-
     pids = xmalloc((size_t)n * sizeof(pid_t));
-    fflush(NULL);           /* avoid duplicating buffered output in children */
+    fflush(NULL);
 
     for (i = 0; i < n; i++) {
         int fd[2] = { -1, -1 };
@@ -110,17 +114,22 @@ int execute_pipeline(Shell *sh, const Pipeline *pl)
         pid = fork();
         if (pid < 0) {
             shell_error("fork: %s", strerror(errno));
-            if (fd[0] >= 0) { close(fd[0]); close(fd[1]); }
+            if (fd[0] >= 0) {
+                close(fd[0]);
+                close(fd[1]);
+            }
             break;
         }
+
         if (pid == 0) {
             exec_child(sh, &pl->cmds[i], prev_read, fd[1],
                        pl->background, i == 0);
         }
+
         pids[forked++] = pid;
     }
 
-    if (forked < n) {                 /* resource failure: clean up */
+    if (forked < n) {
         for (i = 0; i < forked; i++)
             waitpid(pids[i], NULL, 0);
         free(pids);
