@@ -141,6 +141,14 @@ static int read_word(const char **pp, int last_status, char **out,
             } else {
                 p++;                       /* trailing backslash: ignored */
             }
+        } else if (*p == '$' && p[1] == '?') {
+            char status_text[32];
+            int n = snprintf(status_text, sizeof status_text, "%d",
+                             last_status);
+            for (int i = 0; i < n; i++) {
+                sb_putc(&sb, status_text[i]);
+            }
+            p += 2;
         } else {
             sb_putc(&sb, *p++);
         }
