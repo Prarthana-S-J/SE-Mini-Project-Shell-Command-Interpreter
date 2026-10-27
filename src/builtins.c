@@ -88,6 +88,26 @@ static int bi_pwd(void)
     return 0;
 }
 
+static int bi_help(void)
+{
+    printf("Built-in commands:\n");
+    printf("  cd [dir]       Change the current directory\n");
+    printf("  pwd            Print the current working directory\n");
+    printf("  exit [status]  Exit the shell with the specified status\n");
+    printf("  help           Display this help message\n");
+    printf("  export NAME=VALUE  Set or export an environment variable\n");
+    printf("  unset NAME     Remove an environment variable\n");
+    printf("  env            Display environment variables\n");
+    printf("\n");
+    printf("Operators:\n");
+    printf("  ;              Run commands in sequence\n");
+    printf("  |              Connect commands using a pipeline\n");
+    printf("  <              Redirect standard input\n");
+    printf("  >              Redirect standard output (overwrite)\n");
+    printf("  >>             Redirect standard output (append)\n");
+
+    return 0;
+}
 static int bi_exit(Shell *sh, int argc, char **argv)
 {
     char *end;
@@ -123,7 +143,8 @@ int is_builtin(const char *name)
 {
     return strcmp(name, "cd") == 0 ||
            strcmp(name, "pwd") == 0 ||
-	   strcmp(name, "exit") == 0;
+	   strcmp(name, "exit") == 0 ||
+	   strcmp(name, "help") == 0;
 }
 
 int run_builtin(Shell *sh, int argc, char **argv)
@@ -138,6 +159,9 @@ int run_builtin(Shell *sh, int argc, char **argv)
 
     if (strcmp(argv[0], "pwd") == 0)
         return bi_pwd();
+
+    if (strcmp(argv[0], "help") == 0)
+        return bi_help();
 
     if (strcmp(argv[0], "exit") == 0)
         return bi_exit(sh, argc, argv);
