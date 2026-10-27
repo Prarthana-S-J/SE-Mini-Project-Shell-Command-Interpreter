@@ -90,10 +90,59 @@ static int wait_foreground(const pid_t *pids, int n)
 
 
 
+/* ---- Environment assignments ----------------------------------------- */
+
+/* A command consisting entirely of NAME=VALUE words updates the shell
+   environment instead of trying to execute the first word as a program. */
+static int all_assignments(const Command *c)
+{
+    int i;
+
+    if (c->argc == 0 || c->infile != NULL || c->outfile != NULL)
+        return 0;
+
+    for (i = 0; i < c->argc; i++) {
+        if (!is_assignment(c->argv[i]))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int run_assignments(const Command *c)
+{
+    int i;
+    int status = 0;
+
+    for (i = 0; i < c->argc; i++) {
+        const char *equals = strchr(c->argv[i], '=');
+        size_t name_len = (size_t)(equals - c->argv[i]);
+        char *name = xmalloc(name_len + 1);
+
+        memcpy(name, c->argv[i], name_len);
+        name[name_len] = '\0';
+
+        if (setenv(name, equals + 1, 1) != 0) {
+            shell_error("cannot set variable %s: %s",
+                        name, strerror(errno));
+            status = 1;
+        }
+
+        free(name);
+    }
+
+    return status;
+}
+
 int execute_pipeline(Shell *sh, const Pipeline *pl)
 {
     int n = pl->ncmds, i, prev_read = -1, forked = 0, status;
     pid_t *pids;
+
+    if (pl->ncmds == 1 && !pl->background &&
+        all_assignments(&pl->cmds[0])) {
+        return run_assignments(&pl->cmds[0]);
+    }
 
     if (pl->ncmds == 1 && !pl->background &&
         is_builtin(pl->cmds[0].argv[0])) {
