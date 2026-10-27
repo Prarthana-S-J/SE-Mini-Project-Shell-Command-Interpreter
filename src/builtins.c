@@ -88,9 +88,42 @@ static int bi_pwd(void)
     return 0;
 }
 
+static int bi_exit(Shell *sh, int argc, char **argv)
+{
+    char *end;
+    long code;
+
+    if (argc > 2) {
+        shell_error("exit: too many arguments");
+        return 1;
+    }
+
+    if (argc == 1) {
+        sh->exit_code = sh->last_status;
+    } else {
+        errno = 0;
+        code = strtol(argv[1], &end, 10);
+
+        if (argv[1][0] == '\0' || *end != '\0' ||
+            errno == ERANGE || code < 0 || code > 255) {
+            shell_error("exit: numeric argument required");
+            sh->exit_code = 2;
+            sh->running = 0;
+            return 2;
+        }
+
+        sh->exit_code = (int)code;
+    }
+
+    sh->running = 0;
+    return 0;
+}
+
 int is_builtin(const char *name)
 {
-    return strcmp(name, "cd") == 0 || strcmp(name, "pwd") == 0;
+    return strcmp(name, "cd") == 0 ||
+           strcmp(name, "pwd") == 0 ||
+	   strcmp(name, "exit") == 0;
 }
 
 int run_builtin(Shell *sh, int argc, char **argv)
@@ -105,6 +138,9 @@ int run_builtin(Shell *sh, int argc, char **argv)
 
     if (strcmp(argv[0], "pwd") == 0)
         return bi_pwd();
+
+    if (strcmp(argv[0], "exit") == 0)
+        return bi_exit(sh, argc, argv);
 
     return 127;
 }
