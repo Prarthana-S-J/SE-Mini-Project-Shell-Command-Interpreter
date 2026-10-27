@@ -93,76 +93,184 @@ void pipeline_free(Pipeline *pl)
  * string (or NULL when an unquoted expansion produced an empty result and the
  * word must be dropped) and advances *pp. Returns -1 on error.
  */
+static int expand_dollar(const char **pp, int last_status, StrBuf *sb,
+                         char *errbuf, size_t errlen)
+{
+    const char *p = *pp;
+    char tmp[32];
+
+    if (p[1] == '?') {
+        snprintf(tmp, sizeof tmp, "%d", last_status);
+        sb_puts(sb, tmp);
+        *pp = p + 2;
+        return 0;
+    }
+
+    if (p[1] == '$') {
+        snprintf(tmp, sizeof tmp, "%ld", (long)getpid());
+        sb_puts(sb, tmp);
+        *pp = p + 2;
+        return 0;
+    }
+
+    if (p[1] == '{') {
+        const char *close = strchr(p + 2, '}');
+        const char *name_start = p + 2;
+        size_t name_len;
+        char *name;
+        const char *value;
+
+        if (close == NULL ||
+            !is_valid_name(name_start, (size_t)(close - name_start))) {
+            seterr(errbuf, errlen, "bad substitution");
+            return -1;
+        }
+
+        name_len = (size_t)(close - name_start);
+        name = xmalloc(name_len + 1);
+        memcpy(name, name_start, name_len);
+        name[name_len] = '\0';
+
+        value = getenv(name);
+        if (value != NULL)
+            sb_puts(sb, value);
+
+        free(name);
+        *pp = close + 1;
+        return 0;
+    }
+
+    if (isalpha((unsigned char)p[1]) || p[1] == '_') {
+        const char *end = p + 1;
+        size_t name_len;
+        char *name;
+        const char *value;
+
+        while (isalnum((unsigned char)*end) || *end == '_')
+            end++;
+
+        name_len = (size_t)(end - (p + 1));
+        name = xmalloc(name_len + 1);
+        memcpy(name, p + 1, name_len);
+        name[name_len] = '\0';
+
+        value = getenv(name);
+        if (value != NULL)
+            sb_puts(sb, value);
+
+        free(name);
+        *pp = end;
+        return 0;
+    }
+
+    /* A lone or unsupported '$' remains literal. */
+    sb_putc(sb, '$');
+    *pp = p + 1;
+    return 0;
+}
+
 static int read_word(const char **pp, int last_status, char **out,
                      char *errbuf, size_t errlen)
 {
     const char *p = *pp;
     StrBuf sb;
     int quoted = 0;
+    int expansion_seen = 0;
 
-    (void)last_status;
     sb_init(&sb);
 
+    /* Expand a leading ~ only when it stands alone or starts ~/path.
+       ~user is deliberately unsupported. */
+    if (*p == '~' &&
+        (p[1] == '\0' || p[1] == '/' || p[1] == '\n' ||
+         p[1] == ';' || p[1] == ' ' || p[1] == '\t' ||
+         p[1] == '\r')) {
+        const char *home = getenv("HOME");
+        if (home != NULL) {
+            sb_puts(&sb, home);
+            p++;
+            expansion_seen = 1;
+        }
+    }
 
     while (!ends_word(*p)) {
         if (*p == '\'') {
             quoted = 1;
             p++;
+
             while (*p && *p != '\'')
                 sb_putc(&sb, *p++);
+
             if (!*p) {
                 sb_free(&sb);
-                seterr(errbuf, errlen, "syntax error: unterminated single quote");
+                seterr(errbuf, errlen,
+                       "syntax error: unterminated single quote");
                 return -1;
             }
+
             p++;
         } else if (*p == '"') {
             quoted = 1;
             p++;
+
             while (*p && *p != '"') {
-                if (*p == '\\' && (p[1] == '"' || p[1] == '\\' || p[1] == '$')) {
+                if (*p == '\\' &&
+                    (p[1] == '"' || p[1] == '\\' || p[1] == '$')) {
                     sb_putc(&sb, p[1]);
                     p += 2;
+                } else if (*p == '$') {
+                    if (expand_dollar(&p, last_status, &sb,
+                                      errbuf, errlen) < 0) {
+                        sb_free(&sb);
+                        return -1;
+                    }
+                    expansion_seen = 1;
                 } else {
                     sb_putc(&sb, *p++);
                 }
             }
+
             if (!*p) {
                 sb_free(&sb);
-                seterr(errbuf, errlen, "syntax error: unterminated double quote");
+                seterr(errbuf, errlen,
+                       "syntax error: unterminated double quote");
                 return -1;
             }
+
             p++;
         } else if (*p == '\\') {
             quoted = 1;
+
             if (p[1] != '\0' && p[1] != '\n') {
                 sb_putc(&sb, p[1]);
                 p += 2;
             } else {
-                p++;                       /* trailing backslash: ignored */
+                p++;
             }
-        } else if (*p == '$' && p[1] == '?') {
-            char status_text[32];
-            int n = snprintf(status_text, sizeof status_text, "%d",
-                             last_status);
-            for (int i = 0; i < n; i++) {
-                sb_putc(&sb, status_text[i]);
+        } else if (*p == '$') {
+            if (expand_dollar(&p, last_status, &sb,
+                              errbuf, errlen) < 0) {
+                sb_free(&sb);
+                return -1;
             }
-            p += 2;
+            expansion_seen = 1;
         } else {
             sb_putc(&sb, *p++);
         }
     }
 
     *pp = p;
-    if (sb.len == 0 && !quoted) {
+
+    if (sb.len == 0 && !quoted && expansion_seen) {
         sb_free(&sb);
-        *out = NULL;                       /* empty unquoted expansion */
+        *out = NULL;
     } else {
         *out = sb_take(&sb);
     }
+
     return 0;
 }
+
 
 /* ---------- Pipeline parser ------------------------------------------- */
 
