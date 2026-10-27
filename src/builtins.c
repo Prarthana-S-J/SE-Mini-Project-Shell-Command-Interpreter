@@ -19,6 +19,9 @@
 #include <unistd.h>
 
 #include "utils.h"
+extern char **environ;
+
+
 
 static int bi_cd(int argc, char **argv)
 {
@@ -108,6 +111,71 @@ static int bi_help(void)
 
     return 0;
 }
+static int bi_env(void)
+{
+    char **entry;
+
+    for (entry = environ; *entry != NULL; entry++) {
+        puts(*entry);
+    }
+
+    return 0;
+}
+
+static int bi_export(int argc, char **argv)
+{
+    char *equals;
+    size_t name_len;
+
+    if (argc != 2) {
+        shell_error("export: usage: export NAME=VALUE");
+        return 1;
+    }
+
+    equals = strchr(argv[1], '=');
+    if (equals == NULL) {
+        shell_error("export: expected NAME=VALUE");
+        return 1;
+    }
+
+    name_len = (size_t)(equals - argv[1]);
+
+    if (!is_valid_name(argv[1], name_len)) {
+        shell_error("export: invalid variable name");
+        return 1;
+    }
+
+    *equals = '\0';
+
+    if (setenv(argv[1], equals + 1, 1) != 0) {
+        shell_error("export: cannot set variable");
+        *equals = '=';
+        return 1;
+    }
+
+    *equals = '=';
+    return 0;
+}
+
+static int bi_unset(int argc, char **argv)
+{
+    if (argc != 2) {
+        shell_error("unset: usage: unset NAME");
+        return 1;
+    }
+
+    if (!is_valid_name(argv[1], strlen(argv[1]))) {
+        shell_error("unset: invalid variable name");
+        return 1;
+    }
+
+    if (unsetenv(argv[1]) != 0) {
+        shell_error("unset: cannot remove variable");
+        return 1;
+    }
+
+    return 0;
+}
 static int bi_exit(Shell *sh, int argc, char **argv)
 {
     char *end;
@@ -144,7 +212,11 @@ int is_builtin(const char *name)
     return strcmp(name, "cd") == 0 ||
            strcmp(name, "pwd") == 0 ||
 	   strcmp(name, "exit") == 0 ||
-	   strcmp(name, "help") == 0;
+	   strcmp(name, "help") == 0 ||
+            strcmp(name, "export") == 0 ||
+           strcmp(name, "unset") == 0 ||
+           strcmp(name, "env") == 0;
+
 }
 
 int run_builtin(Shell *sh, int argc, char **argv)
@@ -165,6 +237,14 @@ int run_builtin(Shell *sh, int argc, char **argv)
 
     if (strcmp(argv[0], "exit") == 0)
         return bi_exit(sh, argc, argv);
+    if (strcmp(argv[0], "export") == 0)
+        return bi_export(argc, argv);
+
+    if (strcmp(argv[0], "unset") == 0)
+        return bi_unset(argc, argv);
+
+    if (strcmp(argv[0], "env") == 0)
+        return bi_env();
 
     return 127;
 }
