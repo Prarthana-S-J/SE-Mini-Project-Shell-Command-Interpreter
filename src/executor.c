@@ -25,6 +25,32 @@
 #include "builtins.h"
 #include "utils.h"
 
+
+static int redirect_output(const Command *c)
+{
+    int fd;
+
+    if (c->outfile == NULL)
+        return 0;
+
+    fd = open(c->outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+        shell_error("%s: %s", c->outfile, strerror(errno));
+        return -1;
+    }
+
+    if (dup2(fd, STDOUT_FILENO) < 0) {
+        int saved_errno = errno;
+        close(fd);
+        shell_error("%s: %s", c->outfile, strerror(saved_errno));
+        return -1;
+    }
+
+    close(fd);
+    return 0;
+}
+
+
 static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
                        int background, int first)
 {
@@ -47,6 +73,9 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
         }
         close(out_fd);
     }
+
+    if (redirect_output(c) < 0)
+    _exit(1);
 
     execvp(c->argv[0], c->argv);
 
@@ -144,10 +173,41 @@ int execute_pipeline(Shell *sh, const Pipeline *pl)
         return run_assignments(&pl->cmds[0]);
     }
 
+
     if (pl->ncmds == 1 && !pl->background &&
         is_builtin(pl->cmds[0].argv[0])) {
-        return run_builtin(sh, pl->cmds[0].argc, pl->cmds[0].argv);
+        const Command *c = &pl->cmds[0];
+        int saved_out = -1;
+        int status;
+
+        if (c->outfile != NULL) {
+            saved_out = dup(STDOUT_FILENO);
+            if (saved_out < 0) {
+                shell_error("dup: %s", strerror(errno));
+                return 1;
+            }
+
+            if (redirect_output(c) < 0) {
+                (void)dup2(saved_out, STDOUT_FILENO);
+                close(saved_out);
+                return 1;
+            }
+        }
+
+        status = run_builtin(sh, c->argc, c->argv);
+        fflush(stdout);
+
+        if (saved_out >= 0) {
+            if (dup2(saved_out, STDOUT_FILENO) < 0) {
+                shell_error("dup2: %s", strerror(errno));
+                status = 1;
+            }
+            close(saved_out);
+        }
+
+        return status;
     }
+
 
     pids = xmalloc((size_t)n * sizeof(pid_t));
     fflush(NULL);           /* avoid duplicating buffered output in children */
