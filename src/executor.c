@@ -26,6 +26,31 @@
 #include "utils.h"
 
 
+static int redirect_input(const Command *c)
+{
+    int fd;
+
+    if (c->infile == NULL)
+        return 0;
+
+    fd = open(c->infile, O_RDONLY);
+    if (fd < 0) {
+        shell_error("%s: %s", c->infile, strerror(errno));
+        return -1;
+    }
+
+    if (dup2(fd, STDIN_FILENO) < 0) {
+        int saved_errno = errno;
+        close(fd);
+        shell_error("%s: %s", c->infile, strerror(saved_errno));
+        return -1;
+    }
+
+    close(fd);
+    return 0;
+}
+
+
 static int redirect_output(const Command *c)
 {
     int fd;
@@ -56,29 +81,7 @@ static int redirect_output(const Command *c)
     close(fd);
     return 0;
 }
-static int redirect_input(const Command *c)
-{
-    int fd;
 
-    if (c->infile == NULL)
-        return 0;
-
-    fd = open(c->infile, O_RDONLY);
-    if (fd < 0) {
-        shell_error("%s: %s", c->infile, strerror(errno));
-        return -1;
-    }
-
-    if (dup2(fd, STDIN_FILENO) < 0) {
-        int saved_errno = errno;
-        close(fd);
-        shell_error("%s: %s", c->infile, strerror(saved_errno));
-        return -1;
-    }
-
-    close(fd);
-    return 0;
-}
 
 static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
                        int background, int first)
@@ -102,11 +105,12 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
         }
         close(out_fd);
     }
+
     if (redirect_input(c) < 0)
-    _exit(1);
+        _exit(1);
 
     if (redirect_output(c) < 0)
-    _exit(1);
+        _exit(1);
 
     execvp(c->argv[0], c->argv);
 
@@ -304,4 +308,3 @@ int execute_pipeline(Shell *sh, const Pipeline *pl)
     free(pids);
     return status;
 }
-
