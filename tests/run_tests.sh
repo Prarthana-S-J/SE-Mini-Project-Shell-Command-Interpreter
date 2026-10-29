@@ -117,6 +117,11 @@ t TC-14 FR-15 ">> appends to an existing file"                  'echo one > a.tx
 t TC-15 FR-15 ">> creates the file when absent"                 'echo x >> new_app.txt; cat new_app.txt' 'x'
 t TC-16 FR-17 "< missing file: error, status 1, no crash"       'cat < missing.txt; echo $?' '1' 0 'missing.txt: No such file'
 t TC-17 FR-17 "> into a missing directory: error, status 1"     'echo hi > nodir/x.txt; echo $?' '1' 0 'No such file or directory'
+t TC-78 FR-17 "failed input redirection prevents command execution" \
+  'cat < missing.txt; echo shell-alive' 'shell-alive' 0 'missing.txt: No such file'
+t TC-79 FR-17 "failed output redirection prevents command execution" \
+  'echo SHOULD_NOT_RUN > nodir/out.txt; echo shell-alive' 'shell-alive' 0 'No such file or directory'
+
 t TC-70 FR-04 "redirection with no command is rejected"         '> lonely.txt' '' 2 'redirection without a command'
 t TC-71 FR-14 "spaces around > are optional"                    'echo compact>c.txt; cat c.txt' 'compact'
 

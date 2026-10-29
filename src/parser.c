@@ -370,11 +370,17 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
             continue;
         }
 
-        if (c == '>') {
-
+        if (c == '<' || c == '>') {
             char *filename = NULL;
+            char redirection = c;
 
-            if (cur.outfile != NULL) {
+            if (redirection == '<' && cur.infile != NULL) {
+                fail(pl, &cur, cursor, errbuf, errlen,
+                     "syntax error: duplicate input redirection");
+                return PARSE_ERROR;
+            }
+
+            if (redirection == '>' && cur.outfile != NULL) {
                 fail(pl, &cur, cursor, errbuf, errlen,
                      "syntax error: duplicate output redirection");
                 return PARSE_ERROR;
@@ -382,15 +388,18 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
 
             p++;
 
-            if (*p == '>') {
-                cur.append = 1;
-                p++;
-            } else {
-                cur.append = 0;
+            if (redirection == '>') {
+                if (*p == '>') {
+                    cur.append = 1;
+                    p++;
+                } else {
+                    cur.append = 0;
+                }
             }
 
             while (is_blank(*p))
                 p++;
+
             if (read_word(&p, last_status, &filename,
                           errbuf, errlen) < 0) {
                 fail(pl, &cur, cursor, errbuf, errlen, NULL);
@@ -400,11 +409,16 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
             if (filename == NULL || filename[0] == '\0') {
                 free(filename);
                 fail(pl, &cur, cursor, errbuf, errlen,
-                     "syntax error: expected filename after '>'");
+                     redirection == '<'
+                         ? "syntax error: expected filename after '<'"
+                         : "syntax error: expected filename after '>'");
                 return PARSE_ERROR;
             }
 
-            cur.outfile = filename;
+            if (redirection == '<')
+                cur.infile = filename;
+            else
+                cur.outfile = filename;
         } else {
             /* ordinary word */
             char *word = NULL;

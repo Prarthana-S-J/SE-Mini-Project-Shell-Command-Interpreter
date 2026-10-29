@@ -26,6 +26,31 @@
 #include "utils.h"
 
 
+static int redirect_input(const Command *c)
+{
+    int fd;
+
+    if (c->infile == NULL)
+        return 0;
+
+    fd = open(c->infile, O_RDONLY);
+    if (fd < 0) {
+        shell_error("%s: %s", c->infile, strerror(errno));
+        return -1;
+    }
+
+    if (dup2(fd, STDIN_FILENO) < 0) {
+        int saved_errno = errno;
+        close(fd);
+        shell_error("%s: %s", c->infile, strerror(saved_errno));
+        return -1;
+    }
+
+    close(fd);
+    return 0;
+}
+
+
 static int redirect_output(const Command *c)
 {
     int fd;
@@ -81,8 +106,11 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
         close(out_fd);
     }
 
+    if (redirect_input(c) < 0)
+        _exit(1);
+
     if (redirect_output(c) < 0)
-    _exit(1);
+        _exit(1);
 
     execvp(c->argv[0], c->argv);
 
@@ -272,40 +300,6 @@ int execute_pipeline(Shell *sh, const Pipeline *pl)
         for (i = 0; i < forked; i++)
             waitpid(pids[i], NULL, 0);
 
-        free(pids);
-        return 1;
-    }
-
-    status = wait_foreground(pids, n);
-    free(pids);
-    return status;
-}
-
-
-
-    pids = xmalloc((size_t)n * sizeof(pid_t));
-    fflush(NULL);           /* avoid duplicating buffered output in children */
-
-    for (i = 0; i < n; i++) {
-        int fd[2] = { -1, -1 };
-        pid_t pid;
-
-        pid = fork();
-        if (pid < 0) {
-            shell_error("fork: %s", strerror(errno));
-            if (fd[0] >= 0) { close(fd[0]); close(fd[1]); }
-            break;
-        }
-        if (pid == 0) {
-            exec_child(sh, &pl->cmds[i], prev_read, fd[1],
-                       pl->background, i == 0);
-        }
-        pids[forked++] = pid;
-    }
-
-    if (forked < n) {                 /* resource failure: clean up */
-        for (i = 0; i < forked; i++)
-            waitpid(pids[i], NULL, 0);
         free(pids);
         return 1;
     }
