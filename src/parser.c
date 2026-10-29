@@ -27,8 +27,8 @@
 static int is_blank(char c) { return c == ' ' || c == '\t' || c == '\r'; }
 static int is_meta(char c)
 {
-    return c == ';'
-        ;
+    return c == ';' || c == '>' || c == '<' || c == '|'
+        || c == '&';
 }
 static int ends_word(char c){ return c == '\0' || c == '\n' || is_blank(c) ||
                                      is_meta(c); }
@@ -350,13 +350,43 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
                 p++;
             break;
         }
-        /* ordinary word */
-        {
-            char *word = NULL;
-            if (read_word(&p, last_status, &word, errbuf, errlen) < 0) {
+
+        if (c == '>') {
+            char *filename = NULL;
+
+            if (cur.outfile != NULL) {
+                fail(pl, &cur, cursor, errbuf, errlen,
+                     "syntax error: duplicate output redirection");
+                return PARSE_ERROR;
+            }
+
+            p++;
+            while (is_blank(*p))
+                p++;
+            if (read_word(&p, last_status, &filename,
+                          errbuf, errlen) < 0) {
                 fail(pl, &cur, cursor, errbuf, errlen, NULL);
                 return PARSE_ERROR;
             }
+
+            if (filename == NULL || filename[0] == '\0') {
+                free(filename);
+                fail(pl, &cur, cursor, errbuf, errlen,
+                     "syntax error: expected filename after '>'");
+                return PARSE_ERROR;
+            }
+
+            cur.outfile = filename;
+        } else {
+            /* ordinary word */
+            char *word = NULL;
+
+            if (read_word(&p, last_status, &word,
+                          errbuf, errlen) < 0) {
+                fail(pl, &cur, cursor, errbuf, errlen, NULL);
+                return PARSE_ERROR;
+            }
+
             if (word) {
                 command_add_arg(&cur, word);
                 pipe_pending = 0;
