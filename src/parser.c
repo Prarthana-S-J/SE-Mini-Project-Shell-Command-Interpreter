@@ -342,8 +342,8 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
                 p++;
             continue;
         }
-        if (c == '\0' || c == '\n' || c == ';'
-            ) {
+
+        if (c == '\0' || c == '\n' || c == ';') {
             end = p;
             terminator = c;
             if (c != '\0')
@@ -351,7 +351,27 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
             break;
         }
 
+        /*
+         * Handle pipeline separators.
+         * Save the current command and begin parsing the next one.
+         */
+        if (c == '|') {
+            if (cur.argc == 0) {
+                fail(pl, &cur, cursor, errbuf, errlen,
+                     "syntax error: missing command before '|'");
+                return PARSE_ERROR;
+            }
+
+            pipeline_push(pl, &cur, &cap);
+            command_init(&cur);
+
+            p++;
+            pipe_pending = 1;
+            continue;
+        }
+
         if (c == '>') {
+
             char *filename = NULL;
 
             if (cur.outfile != NULL) {
@@ -361,6 +381,14 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
             }
 
             p++;
+
+            if (*p == '>') {
+                cur.append = 1;
+                p++;
+            } else {
+                cur.append = 0;
+            }
+
             while (is_blank(*p))
                 p++;
             if (read_word(&p, last_status, &filename,
