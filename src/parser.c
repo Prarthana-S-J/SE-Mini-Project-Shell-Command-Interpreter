@@ -369,43 +369,56 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
             pipe_pending = 1;
             continue;
         }
+        if (c == '>' || c == '<') {
+    char *filename = NULL;
+    char redirect = c;
 
-        if (c == '>') {
+    p++;
 
-            char *filename = NULL;
+    if (redirect == '<') {
+        if (cur.infile != NULL) {
+            fail(pl, &cur, cursor, errbuf, errlen,
+                 "syntax error: duplicate input redirection");
+            return PARSE_ERROR;
+        }
+    } else {
+        if (cur.outfile != NULL) {
+            fail(pl, &cur, cursor, errbuf, errlen,
+                 "syntax error: duplicate output redirection");
+            return PARSE_ERROR;
+        }
 
-            if (cur.outfile != NULL) {
-                fail(pl, &cur, cursor, errbuf, errlen,
-                     "syntax error: duplicate output redirection");
-                return PARSE_ERROR;
-            }
-
+        if (*p == '>') {
+            cur.append = 1;
             p++;
-
-            if (*p == '>') {
-                cur.append = 1;
-                p++;
-            } else {
-                cur.append = 0;
-            }
-
-            while (is_blank(*p))
-                p++;
-            if (read_word(&p, last_status, &filename,
-                          errbuf, errlen) < 0) {
-                fail(pl, &cur, cursor, errbuf, errlen, NULL);
-                return PARSE_ERROR;
-            }
-
-            if (filename == NULL || filename[0] == '\0') {
-                free(filename);
-                fail(pl, &cur, cursor, errbuf, errlen,
-                     "syntax error: expected filename after '>'");
-                return PARSE_ERROR;
-            }
-
-            cur.outfile = filename;
         } else {
+            cur.append = 0;
+        }
+    }
+
+    while (is_blank(*p))
+        p++;
+
+    if (read_word(&p, last_status, &filename,
+                  errbuf, errlen) < 0) {
+        fail(pl, &cur, cursor, errbuf, errlen, NULL);
+        return PARSE_ERROR;
+    }
+
+    if (filename == NULL || filename[0] == '\0') {
+        free(filename);
+        fail(pl, &cur, cursor, errbuf, errlen,
+             redirect == '<'
+                 ? "syntax error: expected filename after '<'"
+                 : "syntax error: expected filename after '>'");
+        return PARSE_ERROR;
+    }
+
+    if (redirect == '<')
+        cur.infile = filename;
+    else
+        cur.outfile = filename;
+} else {
             /* ordinary word */
             char *word = NULL;
 
