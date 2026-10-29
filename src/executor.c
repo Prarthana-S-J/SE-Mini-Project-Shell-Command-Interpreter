@@ -33,7 +33,14 @@ static int redirect_output(const Command *c)
     if (c->outfile == NULL)
         return 0;
 
-    fd = open(c->outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int flags = O_WRONLY | O_CREAT;
+
+    if (c->append)
+        flags |= O_APPEND;
+    else
+        flags |= O_TRUNC;
+
+    fd = open(c->outfile, flags, 0644);
     if (fd < 0) {
         shell_error("%s: %s", c->outfile, strerror(errno));
         return -1;
@@ -163,22 +170,25 @@ static int run_assignments(const Command *c)
     return status;
 }
 
+
 int execute_pipeline(Shell *sh, const Pipeline *pl)
 {
-    int n = pl->ncmds, i, prev_read = -1, forked = 0, status;
+    int n = pl->ncmds;
+    int i, prev_read = -1, forked = 0, status;
     pid_t *pids;
 
-    if (pl->ncmds == 1 && !pl->background &&
+    if (n <= 0)
+        return 0;
+
+    if (n == 1 && !pl->background &&
         all_assignments(&pl->cmds[0])) {
         return run_assignments(&pl->cmds[0]);
     }
 
-
-    if (pl->ncmds == 1 && !pl->background &&
+    if (n == 1 && !pl->background &&
         is_builtin(pl->cmds[0].argv[0])) {
         const Command *c = &pl->cmds[0];
         int saved_out = -1;
-        int status;
 
         if (c->outfile != NULL) {
             saved_out = dup(STDOUT_FILENO);
@@ -207,6 +217,70 @@ int execute_pipeline(Shell *sh, const Pipeline *pl)
 
         return status;
     }
+
+    pids = xmalloc((size_t)n * sizeof(pid_t));
+    fflush(NULL);
+
+    for (i = 0; i < n; i++) {
+        int fd[2] = { -1, -1 };
+        pid_t pid;
+
+        /* Create a pipe for every command except the last. */
+        if (i < n - 1 && pipe(fd) < 0) {
+            shell_error("pipe: %s", strerror(errno));
+            break;
+        }
+
+        pid = fork();
+
+        if (pid < 0) {
+            shell_error("fork: %s", strerror(errno));
+
+            if (fd[0] >= 0)
+                close(fd[0]);
+            if (fd[1] >= 0)
+                close(fd[1]);
+
+            break;
+        }
+
+        if (pid == 0) {
+            if (fd[0] >= 0)
+                close(fd[0]);
+
+            exec_child(sh, &pl->cmds[i], prev_read, fd[1],
+                       pl->background, i == 0);
+        }
+
+        pids[forked++] = pid;
+
+        /* Parent no longer needs the previous pipe's read end. */
+        if (prev_read >= 0)
+            close(prev_read);
+
+        /* Parent must close the write end so readers can see EOF. */
+        if (fd[1] >= 0)
+            close(fd[1]);
+
+        prev_read = fd[0];
+    }
+
+    if (prev_read >= 0)
+        close(prev_read);
+
+    if (forked < n) {
+        for (i = 0; i < forked; i++)
+            waitpid(pids[i], NULL, 0);
+
+        free(pids);
+        return 1;
+    }
+
+    status = wait_foreground(pids, n);
+    free(pids);
+    return status;
+}
+
 
 
     pids = xmalloc((size_t)n * sizeof(pid_t));
