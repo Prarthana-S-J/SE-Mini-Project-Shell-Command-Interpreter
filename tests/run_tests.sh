@@ -168,6 +168,22 @@ else record TC-34 FR-11 1 "help lists the built-in commands" "output: $out"; fi
 
 # ---- Sequencing, quoting, comments, syntax errors (FR-03, FR-04, FR-19) ---
 t TC-35 FR-19 "; runs commands in order"                        'echo a; echo b; echo c' $'a\nb\nc'
+# ---- Additional FR-19 regression tests -------------------------------
+
+t TC-85 FR-19 "continues after failed command" \
+  'false; echo SUCCESS' 'SUCCESS'
+
+t TC-86 FR-19 "variable update between commands" \
+  'export X=100; echo $X' '100'
+
+t TC-87 FR-19 "pipeline followed by another command" \
+  'echo A | cat; echo B' $'A\nB'
+
+t TC-88 FR-19 "newline-separated commands execute in order" \
+  $'echo A\necho B\necho C' $'A\nB\nC'
+
+t TC-89 FR-19 "previous exit status available to next command" \
+  'false; echo $?' '1'
 t TC-37 FR-03 "double quotes preserve inner spaces"             'echo "a   b"' 'a   b'
 t TC-39 FR-03 "backslash escapes a space"                       'echo a\ b' 'a b'
 t TC-40 FR-03 "comment is ignored"                              'echo hi # comment' 'hi'
