@@ -41,9 +41,29 @@ void shell_cleanup(Shell *sh)
     sh->njobs = 0;
 }
 
+static void sigint_handler(int sig)
+{
+    (void)sig;
+    g_sigint_flag = 1;
+}
+
 void shell_setup_signals(const Shell *sh)
 {
-    (void)sh;       /* Ctrl+C handling is added by story FR-21 */
+    struct sigaction sa;
+
+    if (!sh->interactive)
+        return;
+
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = sigint_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
 }
 
 int shell_execute_line(Shell *sh, const char *line)
@@ -95,8 +115,18 @@ int shell_run_stream(Shell *sh, FILE *in)
         errno = 0;
         n = getline(&line, &cap, in);
         if (n < 0) {
+            if (errno == EINTR) {
+                clearerr(in);
+                if (g_sigint_flag) {
+                    g_sigint_flag = 0;
+                    sh->last_status = 130;
+                }
+                fputc('\n', stderr);
+                continue;
+            }
+
             if (sh->interactive)
-                fputs("exit\n", stderr);     /* Ctrl+D */
+                fputs("exit\n", stderr);
             break;
         }
         g_sigint_flag = 0;
