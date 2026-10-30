@@ -90,6 +90,7 @@ static int redirect_output(const Command *c)
 static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
                        int background, int first)
 {
+    signal(SIGINT, background ? SIG_IGN : SIG_DFL);
     (void)background;
     (void)first;
     (void)sh;
@@ -193,7 +194,7 @@ void jobs_reap(Shell *sh)
 
 static int wait_foreground(const pid_t *pids, int n)
 {
-    int i, status = 0, last_status = 0;
+    int i, status = 0, last_status = 0;int saw_sigint = 0;
 
     for (i = 0; i < n; i++) {
         while (waitpid(pids[i], &status, 0) < 0) {
@@ -202,11 +203,19 @@ static int wait_foreground(const pid_t *pids, int n)
             status = 0;
             break;
         }
+        if (WIFSIGNALED(status) && WTERMSIG(status) == SIGINT)
+            saw_sigint = 1;
         if (i == n - 1)
             last_status = status;
     }
-    if (WIFSIGNALED(last_status) && WTERMSIG(last_status) != SIGPIPE)
+    g_sigint_flag = 0;
+
+    if (saw_sigint) {
+        fputc('\n', stderr);
+    } else if (WIFSIGNALED(last_status) &&
+            WTERMSIG(last_status) != SIGPIPE) {
         fprintf(stderr, "%s\n", strsignal(WTERMSIG(last_status)));
+    }
     if (WIFEXITED(last_status))
         return WEXITSTATUS(last_status);
     if (WIFSIGNALED(last_status))
