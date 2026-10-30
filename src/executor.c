@@ -102,6 +102,13 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
         if (in_fd != STDIN_FILENO)
             close(in_fd);
     }
+    else if (background && first && c->infile == NULL) {
+        int nul = open("/dev/null", O_RDONLY);
+        if (nul >= 0) {
+            dup2(nul, STDIN_FILENO);
+            close(nul);
+        }
+    }
 
     if (out_fd >= 0) {
         if (dup2(out_fd, STDOUT_FILENO) == -1) {
@@ -138,6 +145,49 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
     _exit(126);
 }
 
+/* ---- Background job management ---------------------------------------- */
+
+static void jobs_add(Shell *sh, pid_t pid, const char *text)
+{
+    int id = sh->next_job_id++;
+
+    if (sh->njobs >= MAX_JOBS) {
+        shell_error("maximum background jobs reached");
+        return;
+    }
+
+    Job *j = &sh->jobs[sh->njobs++];
+    j->id = id;
+    j->pid = pid;
+    j->text = xstrdup(text);
+
+    if (sh->interactive)
+        fprintf(stderr, "[%d] %ld\n", id, (long)pid);
+}
+
+void jobs_reap(Shell *sh)
+{
+    int status;
+    pid_t pid;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        for (int i = 0; i < sh->njobs; i++) {
+            if (sh->jobs[i].pid == pid) {
+                if (sh->interactive)
+                    fprintf(stderr, "[%d]+ Done %s\n",
+                            sh->jobs[i].id, sh->jobs[i].text);
+
+                free(sh->jobs[i].text);
+                sh->jobs[i] = sh->jobs[sh->njobs - 1];
+                sh->njobs--;
+                break;
+            }
+        }
+    }
+
+    if (sh->njobs == 0)
+        sh->next_job_id = 1;
+}
 
 /* ---- Parent side ------------------------------------------------------- */
 
@@ -316,7 +366,13 @@ int execute_pipeline(Shell *sh, const Pipeline *pl)
         return 1;
     }
 
-    status = wait_foreground(pids, n);
+    if (pl->background) {
+        jobs_add(sh, pids[n - 1], pl->text);
+        status = 0;
+    } else {
+        status = wait_foreground(pids, n);
+    }
+
     free(pids);
     return status;
 }
