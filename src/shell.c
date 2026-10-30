@@ -86,6 +86,9 @@ int shell_run_stream(Shell *sh, FILE *in)
     while (sh->running) {
         ssize_t n;
 
+        jobs_reap(sh);
+
+
         if (sh->interactive)
             print_prompt();
 

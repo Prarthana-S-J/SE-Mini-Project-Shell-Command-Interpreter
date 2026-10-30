@@ -343,9 +343,18 @@ ParseResult parse_next_pipeline(const char **cursor, int last_status,
             continue;
         }
 
-        if (c == '\0' || c == '\n' || c == ';') {
+        if (c == '\0' || c == '\n' || c == ';' || c == '&') {
             end = p;
             terminator = c;
+            if (c == '&'){
+                if (p[1] == '&') {
+                    fail(pl, &cur, cursor, errbuf, errlen,
+                        "syntax error: '&&' is not supported");
+                    return PARSE_ERROR;
+                }
+
+                pl->background = 1;
+            }
             if (c != '\0')
                 p++;
             break;
