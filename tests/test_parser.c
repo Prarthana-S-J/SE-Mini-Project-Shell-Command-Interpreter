@@ -295,6 +295,14 @@ int main(void)
     report("UT-07", "FR-18", ok, "pipeline of three commands is split correctly");
     if (r == PARSE_OK) pipeline_free(&pl);
 
+    r = P("echo SHOULD_NOT_RUN |", &pl);
+    ok = r == PARSE_ERROR && strstr(errbuf, "missing command after '|'") != NULL;
+    report("UT-80", "FR-18", ok, "trailing pipeline separator is rejected");
+
+    r = P("| echo SHOULD_NOT_RUN", &pl);
+    ok = r == PARSE_ERROR && strstr(errbuf, "missing command before '|'") != NULL;
+    report("UT-81", "FR-18", ok, "leading pipeline separator is rejected");
+
     /* UT-08 */
     r = P("sort < in.txt > out.txt", &pl);
     ok = r == PARSE_OK && pl.cmds[0].argc == 1 &&

@@ -41,12 +41,14 @@ static int redirect_input(const Command *c)
 
     if (dup2(fd, STDIN_FILENO) < 0) {
         int saved_errno = errno;
-        close(fd);
+        if (fd != STDIN_FILENO)
+            close(fd);
         shell_error("%s: %s", c->infile, strerror(saved_errno));
         return -1;
     }
 
-    close(fd);
+    if (fd != STDIN_FILENO)
+        close(fd);
     return 0;
 }
 
@@ -73,12 +75,14 @@ static int redirect_output(const Command *c)
 
     if (dup2(fd, STDOUT_FILENO) < 0) {
         int saved_errno = errno;
-        close(fd);
+        if (fd != STDOUT_FILENO)
+            close(fd);
         shell_error("%s: %s", c->outfile, strerror(saved_errno));
         return -1;
     }
 
-    close(fd);
+    if (fd != STDOUT_FILENO)
+        close(fd);
     return 0;
 }
 
@@ -95,7 +99,8 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
             shell_error("stdin redirection: %s", strerror(errno));
             _exit(126);
         }
-        close(in_fd);
+        if (in_fd != STDIN_FILENO)
+            close(in_fd);
     }
 
     if (out_fd >= 0) {
@@ -103,7 +108,8 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
             shell_error("stdout redirection: %s", strerror(errno));
             _exit(126);
         }
-        close(out_fd);
+        if (out_fd != STDOUT_FILENO)
+            close(out_fd);
     }
 
     if (redirect_input(c) < 0)
@@ -111,6 +117,12 @@ static void exec_child(Shell *sh, const Command *c, int in_fd, int out_fd,
 
     if (redirect_output(c) < 0)
         _exit(1);
+
+    if (is_builtin(c->argv[0])) {
+        int builtin_status = run_builtin(sh, c->argc, c->argv);
+        fflush(NULL);
+        _exit(builtin_status);
+    }
 
     execvp(c->argv[0], c->argv);
 
