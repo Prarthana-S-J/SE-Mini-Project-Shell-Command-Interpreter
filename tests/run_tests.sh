@@ -133,6 +133,11 @@ t TC-21 FR-18 "built-in inside a pipeline (pwd | cat)"          'pwd | cat' "$W"
 t TC-22 FR-14 "built-in with output redirection (pwd > f)"      'pwd > pwd.txt; cat pwd.txt' "$W"
 t TC-57 FR-18 "ten-stage pipeline"                              'echo x | cat | cat | cat | cat | cat | cat | cat | cat | cat' 'x'
 t TC-58 FR-18 "failing first stage does not hang the pipeline"  'nosuchcmd | cat; echo $?' '0' 0 'command not found'
+t TC-80 FR-18 "pipeline returns final command status"            'echo ignored | sh -c "exit 7"' '' 7
+t TC-81 FR-18 "built-in in a pipeline can consume stdin"         'printf "line\n" | grep line' 'line'
+t TC-82 FR-18 "pipeline handles large output"                   'seq 1 20000 | wc -l' '20000'
+t TC-83 FR-04 "leading pipe is rejected without execution"      '| echo SHOULD_NOT_RUN' '' 2 "missing command before '|'"
+t TC-84 FR-04 "trailing pipe is rejected without execution"     'echo SHOULD_NOT_RUN |' '' 2 "missing command after '|'"
 
 # ---- Environment / expansion (FR-12, FR-13) ---------------------------------
 t TC-23 FR-12 "export then \$VAR"                               'export FOO=bar; echo $FOO' 'bar'
