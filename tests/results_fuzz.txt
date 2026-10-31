@@ -1,0 +1,2 @@
+SC-12 SR-06 PASS parser fuzz: 200000 random inputs (101689 pipelines parsed, 160075 syntax errors, 39925 empty), 0 invariant violations, sanitizer reports: none (run aborts on any)
+SC-13 SR-06 PASS process-level fuzz: 600 random command lines run through the real shell (sanitizer build if MYSH is the ASan binary), 0 crashes/hangs/sanitizer reports
