@@ -8,6 +8,8 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "shell.h"
 #include "utils.h"
@@ -48,6 +50,12 @@ int main(int argc, char **argv)
         if (!f) {
             shell_error("%s: cannot open script file", argv[1]);
             return 127;
+        }
+        if (fcntl(fileno(f), F_SETFD, FD_CLOEXEC) == -1) {
+             shell_error("%s: cannot set close-on-exec", argv[1]);
+             fclose(f);
+             shell_cleanup(&sh);
+             return 1;
         }
         sh.interactive = 0;
         rc = shell_run_stream(&sh, f);
