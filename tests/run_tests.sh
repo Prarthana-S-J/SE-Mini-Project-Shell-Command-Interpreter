@@ -84,6 +84,7 @@ meta TC-54 'echo 1 2 3 ... 2000  (2000 arguments)'     'exactly 2000 words print
 meta TC-55 'echo <100000 x "a">'                       '100001 bytes printed'
 meta TC-77 'true | true;  (repeated 300 times) echo survived' 'survived'
 meta ST-10 'mysh demo/demo.mysh'                       'all documented demo outputs present; exit status 0'
+meta ST-13 "interactive mysh prompt" "prompt displays the current working directory"
 
 echo "== Functional / integration / system tests for mysh =="
 echo "shell under test: $MYSH"
@@ -348,6 +349,19 @@ out="$(cd "$W" && "$MYSH" -c 'help' 2>&1)"; lines="$(printf '%s\n' "$out" | wc -
 meta NF-08 "help" "at most 25 lines, no line longer than 80 characters, lists all 7 built-ins"
 n7=0; for b in cd pwd exit help export unset env; do printf '%s\n' "$out" | grep -qE "^  $b( |\$)" && n7=$((n7+1)); done
 [ "$lines" -le 25 ] && [ "$widest" -le 80 ] && [ "$n7" -eq 7 ] && record NF-08 NFR-03 0 "help fits one screen (${lines} lines, widest ${widest} columns) and lists all 7 built-ins" || record NF-08 NFR-03 1 "help fits one screen and lists all 7 built-ins" "lines=$lines widest=$widest builtins=$n7"
+# ---- NFR-03: Interactive prompt usability -------------------------------
+prompt_out="$(printf 'exit\n' | script -q -c "$MYSH" /dev/null 2>/dev/null)"
+expected_prompt="mysh:$PWD$"
+
+case "$prompt_out" in
+    *"$expected_prompt"*)
+        record ST-13 NFR-03 0 "interactive prompt displays the current working directory"
+        ;;
+    *)
+        record ST-13 NFR-03 1 "interactive prompt displays the current working directory" \
+            "expected [$expected_prompt], got [$prompt_out]"
+        ;;
+esac
 
 # ---- System test: full demonstration script ---------------------------------
 if [ -f "$W/demo.mysh" ]; then
