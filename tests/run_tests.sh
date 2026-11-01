@@ -294,7 +294,7 @@ printf 'echo a | cat\ncd /\npwd\nexport Q=1\nnosuchcmd\necho x > /dev/null\n' | 
 left="$(find "$H" "$C" -mindepth 1 | wc -l)"; rm -rf "$H" "$C"
 meta SC-06 "session of 6 commands (pipe, cd, export, error, redirect to /dev/null) with HOME and cwd empty" "no file created in HOME or cwd (no history, no log)"
 [ "$left" -eq 0 ] && record SC-06 SR-04 0 "shell writes no history/log/state files of its own" || record SC-06 SR-04 1 "shell writes no history/log/state files of its own" "$left stray files"
-( umask 077; cd "$W" && "$MYSH" -c 'echo x > m077.txt' 2>/dev/null ); ( umask 022; cd "$W" && "$MYSH" -c 'echo x > m022.txt' 2>/dev/null ); ( umask 000; cd "$W" && "$MYSH" -c 'echo x > m000.txt >> m000.txt' 2>/dev/null )
+( umask 077; cd "$W" && "$MYSH" -c 'echo x > m077.txt' 2>/dev/null ); ( umask 022; cd "$W" && "$MYSH" -c 'echo x > m022.txt' 2>/dev/null ); ( umask 000; cd "$W" && "$MYSH" -c 'echo x > m000.txt' 2>/dev/null )
 a="$(stat -c %a "$W/m077.txt")"; b="$(stat -c %a "$W/m022.txt")"; c="$(stat -c %a "$W/m000.txt")"
 meta SC-07 "echo x > f   under umask 077 / 022 / 000" "file modes 600 / 644 / 644 (never more permissive than 0644)"
 [ "$a/$b/$c" = "600/644/644" ] && record SC-07 SR-05 0 "created files are never more permissive than 0644 and honour the umask" || record SC-07 SR-05 1 "created files are never more permissive than 0644 and honour the umask" "modes $a/$b/$c"

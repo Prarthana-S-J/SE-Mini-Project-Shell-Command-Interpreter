@@ -141,7 +141,7 @@ static int bi_export(int argc, char **argv)
     name_len = (size_t)(equals - argv[1]);
 
     if (!is_valid_name(argv[1], name_len)) {
-        shell_error("export: invalid variable name");
+        shell_error("export: not a valid identifier");
         return 1;
     }
 
@@ -165,7 +165,7 @@ static int bi_unset(int argc, char **argv)
     }
 
     if (!is_valid_name(argv[1], strlen(argv[1]))) {
-        shell_error("unset: invalid variable name");
+        shell_error("unset: not a valid identifier");
         return 1;
     }
 
